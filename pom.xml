@@ -12,6 +12,39 @@
         <maven.compiler.source>19</maven.compiler.source>
         <maven.compiler.target>19</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <vertx.version>3.0.0-SNAPSHOT</vertx.version>
+        <picocli.version>4.7.6</picocli.version>
     </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <version>${picocli.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <!-- annotationProcessorPaths requires maven-compiler-plugin version 3.5 or higher -->
+                    <version>${maven-compiler-plugin-version}</version>
+                    <configuration>
+                        <annotationProcessorPaths>
+                            <path>
+                                <groupId>info.picocli</groupId>
+                                <artifactId>picocli-codegen</artifactId>
+                                <version>4.7.6</version>
+                            </path>
+                        </annotationProcessorPaths>
+                        <compilerArgs>
+                            <arg>-Aproject=${project.groupId}/${project.artifactId}</arg>
+                        </compilerArgs>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 </project>
