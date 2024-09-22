@@ -12,12 +12,9 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.List;
 import java.util.Map;
-import java.util.logging.Logger;
 import java.util.zip.GZIPInputStream;
 
 public class ProxyHandler implements HttpHandler {
-
-    private static final Logger logger = Logger.getLogger(ProxyHandler.class.getName());
 
     private final String targetUrl;
 
@@ -57,9 +54,8 @@ public class ProxyHandler implements HttpHandler {
     }
 
     private void logRequest(HttpExchange exchange, String fullTargetUrl) {
-        logger.info("Request Method: " + exchange.getRequestMethod());
-        logger.info("Request URL: " + fullTargetUrl);
-        exchange.getRequestHeaders().forEach((k, v) -> logger.info("Header: " + k + " = " + String.join(",", v)));
+        System.out.println("Request " + exchange.getRequestMethod() + ": " + fullTargetUrl);
+//        exchange.getRequestHeaders().forEach((k, v) -> System.out.println("Header: " + k + " = " + String.join(",", v)));
     }
 
     private static void forwardRequestHeaders(HttpExchange exchange, HttpURLConnection connection) {
@@ -77,7 +73,7 @@ public class ProxyHandler implements HttpHandler {
         try (InputStream requestBody = exchange.getRequestBody();
              OutputStream connectionOut = connection.getOutputStream()) {
             byte[] bodyData = readBodyFromInputStream(requestBody);
-            logger.info("Request Body: " + new String(bodyData));
+            System.out.println("Body: " + new String(bodyData));
             connectionOut.write(bodyData);
         }
     }
@@ -131,22 +127,21 @@ public class ProxyHandler implements HttpHandler {
                 while ((bytesRead = gzipInputStream.read(buffer)) != -1) {
                     uncompressedOutput.write(buffer, 0, bytesRead);
                 }
-                logger.info("Unzipped Response Body: " + new String(uncompressedOutput.toByteArray()));
+                System.out.println("Unzipped Response: " + new String(uncompressedOutput.toByteArray()));
             }
         } else {
-            logger.info("Response Body: " + new String(responseData));
+            System.out.println("Response: " + new String(responseData));
         }
     }
 
     private void logResponse(int responseCode, Map<String, List<String>> headers) {
-        logger.info("Response Code: " + responseCode);
-        headers.forEach((k, v) -> logger.info("Response Header: " + k + " = " + String.join(",", v)));
+        System.out.println("Response Code: " + responseCode);
+//        headers.forEach((k, v) -> logger.info("Response Header: " + k + " = " + String.join(",", v)));
     }
 
     private static void handleException(HttpExchange exchange, Exception e) {
         e.printStackTrace();
         try {
-            // In case of any error, send a 500 response
             exchange.sendResponseHeaders(500, -1);
         } catch (Exception ex) {
             ex.printStackTrace();

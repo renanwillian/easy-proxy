@@ -25,9 +25,8 @@ public class ProxyServer  {
         server.setExecutor(executor);
 
         server.start();
-        System.out.println("Proxy server is running on http://localhost:" + port + "/");
-        System.out.println("Proxying to: " + targetUrl);
 
+        System.out.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
         Thread.currentThread().join();
     }
 }
