@@ -37,9 +37,11 @@ public class LogService {
 
             sb.append(AnsiUtils.colorize("Timestamp: ", AnsiUtils.WHITE_BOLD));
             sb.append(AnsiUtils.colorize(logEntry.getTimestamp().toString(), AnsiUtils.WHITE));
+            sb.append(BREAK);
             if (showHeaders && logEntry.getRequestHeaders() != null) {
                 sb.append(AnsiUtils.colorize("Headers: ", AnsiUtils.WHITE_BOLD));
-                logEntry.getRequestHeaders().forEach((k, v) -> sb.append(AnsiUtils.colorize("  " + k + ": " + v + BREAK, AnsiUtils.WHITE)));
+                logEntry.getRequestHeaders().forEach((k, v) -> sb.append(AnsiUtils.colorize("\n  " + k + ": " + v, AnsiUtils.WHITE)));
+                sb.append(BREAK);
             }
 
             if (logEntry.getRequestBody() != null) {
