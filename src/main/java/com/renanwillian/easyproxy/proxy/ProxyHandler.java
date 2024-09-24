@@ -23,7 +23,7 @@ public class ProxyHandler implements HttpHandler {
     private final LogService logService;
 
     public ProxyHandler(String targetUrl, LogService logService) {
-        this.targetUrl = targetUrl;
+        this.targetUrl = targetUrl.endsWith("/") ? targetUrl.substring(0, targetUrl.length() - 1) : targetUrl;
         this.logService = logService;
     }
 
