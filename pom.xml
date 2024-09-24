@@ -53,7 +53,7 @@
                     <configuration>
                         <archive>
                             <manifest>
-                                <mainClass>com.renanwillian.easyproxy.ProxyServerCLI</mainClass>
+                                <mainClass>com.renanwillian.easyproxy.EasyProxy</mainClass>
                             </manifest>
                         </archive>
                     </configuration>

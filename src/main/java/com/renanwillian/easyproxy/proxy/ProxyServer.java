@@ -1,5 +1,6 @@
-package com.renanwillian.easyproxy;
+package com.renanwillian.easyproxy.proxy;
 
+import com.renanwillian.easyproxy.log.LogService;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -11,22 +12,21 @@ public class ProxyServer  {
 
     private final int port;
     private final String targetUrl;
+    private final LogService logService;
 
-    public ProxyServer(int port, String targetUrl) {
+    public ProxyServer(int port, String targetUrl, LogService logService) {
         this.port = port;
         this.targetUrl = targetUrl;
+        this.logService = logService;
     }
 
-    public void start() throws IOException, InterruptedException {
+    public void start() throws IOException {
         HttpServer server = HttpServer.create(new InetSocketAddress(port), 0);
-        server.createContext("/", new ProxyHandler(targetUrl));
+        server.createContext("/", new ProxyHandler(targetUrl, logService));
 
         ExecutorService executor = Executors.newCachedThreadPool();
         server.setExecutor(executor);
 
         server.start();
-
-        System.out.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
-        Thread.currentThread().join();
     }
 }
