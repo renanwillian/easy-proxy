@@ -2,7 +2,6 @@ package com.renanwillian.easyproxy.proxy;
 
 import com.renanwillian.easyproxy.log.LogEntry;
 import com.renanwillian.easyproxy.log.LogService;
-import com.renanwillian.easyproxy.utils.GzipUtils;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -30,14 +29,14 @@ public class ProxyHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) {
+        Instant start = Instant.now();
+        LogEntry log = new LogEntry();
+        log.setTimestamp(LocalDateTime.now());
         try {
-            Instant start = Instant.now();
-            LogEntry log = new LogEntry();
             log.setMethod(exchange.getRequestMethod());
             log.setPath(exchange.getRequestURI().toString());
 
             HttpURLConnection connection = getHttpURLConnection(exchange);
-
             Map<String, String> requestHeaders = getRequestHeaders(exchange);
             forwardRequestHeaders(requestHeaders, connection);
             log.setRequestHeaders(requestHeaders);
@@ -48,6 +47,9 @@ public class ProxyHandler implements HttpHandler {
                 forwardRequestBody(connection, requestBody);
             }
 
+            log.setStatusCode(connection.getResponseCode());
+            log.setResponseMessage(connection.getResponseMessage());
+
             Map<String, String> responseHeaders = getResponseHeaders(connection);
             forwardResponseHeaders(exchange, responseHeaders);
 
@@ -56,18 +58,15 @@ public class ProxyHandler implements HttpHandler {
 
             log.setResponseHeaders(responseHeaders);
             log.setResponseBody(responseBody);
-            log.setTimestamp(LocalDateTime.now());
-            log.setStatusCode(connection.getResponseCode());
-            log.setResponseMessage(connection.getResponseMessage());
-
-            long duration = Instant.now().toEpochMilli() - start.toEpochMilli();
-            log.setDuration(duration);
-            logService.log(log);
         } catch (Exception e) {
+            log.setResponseMessage(e.getMessage());
             handleException(exchange, e);
         } finally {
             exchange.close();
         }
+        long duration = Instant.now().toEpochMilli() - start.toEpochMilli();
+        log.setDuration(duration);
+        logService.log(log);
     }
 
     private static void forwardResponseHeaders(HttpExchange exchange, Map<String, String> responseHeaders) {
@@ -89,6 +88,8 @@ public class ProxyHandler implements HttpHandler {
         URL url = new URL(fullTargetUrl);
         HttpURLConnection connection = (HttpURLConnection) url.openConnection();
         connection.setRequestMethod(exchange.getRequestMethod());
+        connection.setConnectTimeout(5000);
+        connection.setReadTimeout(10000);
         return connection;
     }
 
@@ -154,21 +155,9 @@ public class ProxyHandler implements HttpHandler {
         }
     }
 
-    private static void logResponseBody(HttpURLConnection connection, byte[] responseData) throws IOException {
-        String contentEncoding = connection.getHeaderField("Content-Encoding");
-        if ("gzip".equalsIgnoreCase(contentEncoding)) {
-            System.out.println("Response: " + new String(GzipUtils.uncompress(responseData)));
-        } else {
-            System.out.println("Response: " + new String(responseData));
-        }
-    }
-
     private static void handleException(HttpExchange exchange, Exception e) {
-        e.printStackTrace();
         try {
             exchange.sendResponseHeaders(500, -1);
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
+        } catch (Exception ignored) {}
     }
 }
