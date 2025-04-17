@@ -2,6 +2,7 @@ package com.renanwillian.easyproxy;
 
 import com.renanwillian.easyproxy.log.LogService;
 import com.renanwillian.easyproxy.proxy.ProxyServer;
+import com.renanwillian.easyproxy.utils.TerminalUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -36,13 +37,12 @@ public class EasyProxy implements Runnable {
             ProxyServer server = new ProxyServer(port, targetUrl, logService);
             server.start();
 
-            System.out.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
-            System.out.println();
+            TerminalUtils.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
+            TerminalUtils.println();
 
             Thread.currentThread().join();
         } catch (Exception e) {
-            System.err.println("Error starting the server: " + e.getMessage());
-            e.printStackTrace();
+            TerminalUtils.printlnError("Error starting the server: " + e.getMessage());
         }
     }
 }

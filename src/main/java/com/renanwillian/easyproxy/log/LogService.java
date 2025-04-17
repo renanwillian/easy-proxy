@@ -2,6 +2,7 @@ package com.renanwillian.easyproxy.log;
 
 import com.renanwillian.easyproxy.utils.AnsiUtils;
 import com.renanwillian.easyproxy.utils.GzipUtils;
+import com.renanwillian.easyproxy.utils.TerminalUtils;
 
 import java.io.IOException;
 import java.util.Map;
@@ -57,7 +58,7 @@ public class LogService {
             sb.append(AnsiUtils.colorize("-------------------------------------------------------------\n", AnsiUtils.WHITE));
         }
 
-        System.out.println(sb);
+        TerminalUtils.println(sb.toString());
     }
 
     private String getBodyAsString(byte[] body, Map<String, String> headers) {
