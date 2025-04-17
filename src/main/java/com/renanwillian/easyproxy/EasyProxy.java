@@ -8,7 +8,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
-@Command(name = "easy-proxy", mixinStandardHelpOptions = true, version = "1.0",
+@Command(name = "easy-proxy", mixinStandardHelpOptions = true, version = "0.1.0",
         description = "Starts a reverse proxy server.")
 public class EasyProxy implements Runnable {
 
