@@ -90,7 +90,7 @@
                         </executions>
                         <configuration>
                             <buildArgs>
-                                <buildArgss>--enable-url-protocols=http</buildArgss>
+                                <buildArgs>--enable-url-protocols=http,https</buildArgs>
                             </buildArgs>
                         </configuration>
                     </plugin>
