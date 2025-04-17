@@ -41,6 +41,9 @@ public class EasyProxy implements Runnable {
             TerminalUtils.println();
 
             Thread.currentThread().join();
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            TerminalUtils.printlnError("Server start interrupted: " + ie.getMessage());
         } catch (Exception e) {
             TerminalUtils.printlnError("Error starting the server: " + e.getMessage());
         }
