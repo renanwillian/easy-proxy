@@ -31,10 +31,8 @@ public class EasyProxy implements Runnable {
 
     @Override
     public void run() {
-        try {
-            LogService logService = new LogService(headers, details);
-
-            ProxyServer server = new ProxyServer(port, targetUrl, logService);
+        LogService logService = new LogService(headers, details);
+        try (ProxyServer server = new ProxyServer(port, targetUrl, logService)) {
             server.start();
 
             TerminalUtils.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
