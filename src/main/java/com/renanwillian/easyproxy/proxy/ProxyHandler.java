@@ -9,8 +9,11 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.ConnectException;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -59,8 +62,7 @@ public class ProxyHandler implements HttpHandler {
             log.setResponseHeaders(responseHeaders);
             log.setResponseBody(responseBody);
         } catch (Exception e) {
-            log.setResponseMessage(e.getMessage());
-            handleException(exchange, e);
+            handleException(exchange, e, log);
         } finally {
             exchange.close();
         }
@@ -155,9 +157,26 @@ public class ProxyHandler implements HttpHandler {
         }
     }
 
-    private static void handleException(HttpExchange exchange, Exception e) {
+    private static void handleException(HttpExchange exchange, Exception e, LogEntry log) {
+        int statusCode = 500;
+        String message = "Internal Server Error";
+
+        if (e instanceof ConnectException) {
+            statusCode = 502;
+            message = "Bad Gateway: Unable to connect to upstream server.";
+        } else if (e instanceof SocketTimeoutException) {
+            statusCode = 504;
+            message = "Gateway Timeout: Upstream server took too long to respond.";
+        }
+
+        log.setStatusCode(statusCode);
+        log.setResponseMessage(message);
+
         try {
-            exchange.sendResponseHeaders(500, -1);
+            byte[] responseBytes = message.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/plain; charset=UTF-8");
+            exchange.sendResponseHeaders(statusCode, responseBytes.length);
+            exchange.getResponseBody().write(responseBytes);
         } catch (Exception ignored) {}
     }
 }
