@@ -1,6 +1,7 @@
 package com.renanwillian.easyproxy.proxy;
 
 import com.renanwillian.easyproxy.log.LogService;
+import com.renanwillian.easyproxy.utils.UrlUtils;
 import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
@@ -20,7 +21,7 @@ public class ProxyServer implements AutoCloseable {
 
     public ProxyServer(int port, String targetUrl, LogService logService) {
         this.port = port;
-        this.targetUrl = targetUrl;
+        this.targetUrl = UrlUtils.sanitizeUrl(targetUrl);
         this.logService = logService;
     }
 

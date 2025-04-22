@@ -2,6 +2,7 @@ package com.renanwillian.easyproxy.proxy;
 
 import com.renanwillian.easyproxy.log.LogEntry;
 import com.renanwillian.easyproxy.log.LogService;
+import com.renanwillian.easyproxy.utils.UrlUtils;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
@@ -26,7 +27,7 @@ public class ProxyHandler implements HttpHandler {
     private final LogService logService;
 
     public ProxyHandler(String targetUrl, LogService logService) {
-        this.targetUrl = targetUrl.endsWith("/") ? targetUrl.substring(0, targetUrl.length() - 1) : targetUrl;
+        this.targetUrl = targetUrl;
         this.logService = logService;
     }
 
