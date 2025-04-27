@@ -1,0 +1,44 @@
+name: Build Native Image and Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on tags like v1.0.0
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04  # Using Ubuntu 22.04 to ensure compatibility
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: '22.3.1'
+          java-version: '19'
+          components: 'native-image'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tar
+
+      - name: Build native image with Maven
+        run: |
+          ./mvnw -Pnative package
+
+      - name: Compress binary
+        run: |
+          tar -czvf easy-proxy-linux-x86_64.tar.gz -C target easy-proxy
+
+      - name: Create release and attach artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: easy-proxy-linux-x86_64.tar.gz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

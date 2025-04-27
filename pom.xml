@@ -113,7 +113,7 @@
                         </executions>
                         <configuration>
                             <buildArgs>
-                                <buildArgs>--enable-url-protocols=http,https</buildArgs>
+                                <buildArg>--enable-url-protocols=http,https</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
