@@ -46,7 +46,7 @@ Use -h or --help at any time to see all available options.
 
 ### Building a native package
 ```shell
-mvn -Pnative package
+./mvnw -Pnative package
 ./target/easy-proxy --version
 ```
 
