@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # Using Ubuntu 22.04 to ensure compatibility
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
@@ -21,16 +21,25 @@ jobs:
         with:
           version: '22.3.1'
           java-version: '19'
-          components: 'native-image'
 
-      - name: Install dependencies
+      - name: Install musl and dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tar
+          sudo apt-get install -y musl-tools zlib1g-dev
+          sudo apt-get install -y musl-dev
+          mkdir -p /tmp/zlib-musl
+          cd /tmp/zlib-musl
+          wget https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz
+          tar -xzf zlib-1.3.1.tar.gz
+          cd zlib-1.3.1
+          CC=musl-gcc ./configure --static --prefix=/usr/local/musl
+          make
+          sudo make install
+          sudo ln -s /usr/local/musl/lib/libz.a /usr/lib/x86_64-linux-musl/libz.a
 
-      - name: Build native image with Maven
+      - name: Build native image with Maven and musl
         run: |
-          ./mvnw -Pnative package
+          ./mvnw -Pnative-musl package
 
       - name: Compress binary
         run: |
