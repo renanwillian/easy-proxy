@@ -1,12 +1,19 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
 
-// rootCmd represents the base command when called without any subcommands
+var (
+	targetURL string
+	port      int
+	details   bool
+	headers   bool
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "easy-proxy <target-url>",
 	Short: "Expose any HTTP server locally through a reverse proxy.",
@@ -26,10 +33,13 @@ Examples:
   easy-proxy https://httpbin.org
   easy-proxy https://httpbin.org --port 8080
   easy-proxy https://api.example.com --details`,
+	Args: cobra.ExactArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		targetURL = args[0]
+		return run()
+	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
@@ -38,13 +48,16 @@ func Execute() {
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	rootCmd.Flags().IntVarP(&port, "port", "p", 8000, "Port the proxy will listen on")
+	rootCmd.Flags().BoolVar(&details, "details", false, "Show request/response details")
+	rootCmd.Flags().BoolVar(&headers, "headers", false, "Show request/response headers")
+}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.easy-proxy.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func run() error {
+	// TODO: start proxy server
+	fmt.Println("Target:", targetURL)
+	fmt.Println("Port:", port)
+	fmt.Println("Details:", details)
+	fmt.Println("Headers:", headers)
+	return nil
 }
