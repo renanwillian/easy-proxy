@@ -3,6 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/signal"
+	"syscall"
+
+	"easy-proxy/internal/log"
+	"easy-proxy/internal/proxy"
 
 	"github.com/spf13/cobra"
 )
@@ -54,10 +59,20 @@ func init() {
 }
 
 func run() error {
-	// TODO: start proxy server
-	fmt.Println("Target:", targetURL)
-	fmt.Println("Port:", port)
-	fmt.Println("Details:", details)
-	fmt.Println("Headers:", headers)
-	return nil
+	logSvc := log.NewService(headers, details)
+	srv := proxy.NewServer(port, targetURL, logSvc)
+
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		<-sigCh
+		fmt.Println("\nShutting down...")
+		srv.Stop()
+	}()
+
+	fmt.Printf("Proxy server running on http://localhost:%d and redirecting to %s\n", srv.Port(), srv.TargetURL())
+	fmt.Println()
+
+	return srv.Start()
 }
