@@ -46,6 +46,11 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		entry.RequestHeaders[k] = strings.Join(v, ",")
 	}
 
+	defer func() {
+		entry.Duration = time.Since(start)
+		h.logSvc.Log(entry)
+	}()
+
 	reqBody, _ := io.ReadAll(r.Body)
 	r.Body.Close()
 	entry.RequestBody = reqBody
@@ -54,7 +59,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	upstreamReq, err := http.NewRequest(r.Method, upstreamURL, bytes.NewReader(reqBody))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "Internal Server Error", &entry, h.logSvc)
+		writeError(w, http.StatusInternalServerError, "Internal Server Error", &entry)
 		return
 	}
 
@@ -62,7 +67,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := h.client.Do(upstreamReq)
 	if err != nil {
-		handleError(w, err, &entry, h.logSvc)
+		handleError(w, err, &entry)
 		return
 	}
 	defer resp.Body.Close()
@@ -87,29 +92,25 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(resp.StatusCode)
 		w.Write(respBody)
 	}
-
-	entry.Duration = time.Since(start)
-	h.logSvc.Log(entry)
 }
 
-func writeError(w http.ResponseWriter, status int, msg string, entry *log.Entry, logSvc log.Logger) {
+func writeError(w http.ResponseWriter, status int, msg string, entry *log.Entry) {
 	entry.StatusCode = status
 	entry.ResponseMessage = msg
 	http.Error(w, msg, status)
-	logSvc.Log(*entry)
 }
 
-func handleError(w http.ResponseWriter, err error, entry *log.Entry, logSvc log.Logger) {
+func handleError(w http.ResponseWriter, err error, entry *log.Entry) {
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
-		writeError(w, http.StatusGatewayTimeout, "Gateway Timeout: Upstream server took too long to respond.", entry, logSvc)
+		writeError(w, http.StatusGatewayTimeout, "Gateway Timeout: Upstream server took too long to respond.", entry)
 		return
 	}
 
 	if errors.Is(err, syscall.ECONNREFUSED) || strings.Contains(err.Error(), "connection refused") {
-		writeError(w, http.StatusBadGateway, "Bad Gateway: Unable to connect to upstream server.", entry, logSvc)
+		writeError(w, http.StatusBadGateway, "Bad Gateway: Unable to connect to upstream server.", entry)
 		return
 	}
 
-	writeError(w, http.StatusInternalServerError, "Internal Server Error", entry, logSvc)
+	writeError(w, http.StatusInternalServerError, "Internal Server Error", entry)
 }
