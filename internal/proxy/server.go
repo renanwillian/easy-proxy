@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -43,7 +44,11 @@ func (s *Server) Start() error {
 	}
 	s.running.Store(true)
 
-	return s.srv.Serve(listener)
+	err = s.srv.Serve(listener)
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
 func (s *Server) Stop() error {
