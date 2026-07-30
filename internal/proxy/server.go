@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync/atomic"
 	"time"
 
 	"easy-proxy/internal/log"
@@ -14,7 +15,7 @@ type Server struct {
 	targetURL string
 	logSvc    *log.Service
 	srv       *http.Server
-	running   bool
+	running   atomic.Bool
 }
 
 func NewServer(port int, targetURL string, logSvc *log.Service) *Server {
@@ -31,7 +32,7 @@ func (s *Server) Start() error {
 		Addr:    fmt.Sprintf(":%d", s.port),
 		Handler: handler,
 	}
-	s.running = true
+	s.running.Store(true)
 	return s.srv.ListenAndServe()
 }
 
@@ -39,14 +40,14 @@ func (s *Server) Stop() error {
 	if s.srv != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		s.running = false
+		s.running.Store(false)
 		return s.srv.Shutdown(ctx)
 	}
 	return nil
 }
 
 func (s *Server) IsRunning() bool {
-	return s.running
+	return s.running.Load()
 }
 
 func (s *Server) TargetURL() string {
