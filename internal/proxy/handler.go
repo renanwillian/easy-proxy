@@ -19,13 +19,17 @@ type Handler struct {
 	client    *http.Client
 }
 
-func NewHandler(targetURL string, logSvc log.Logger) *Handler {
+func NewHandler(targetURL string, logSvc log.Logger, client *http.Client) *Handler {
+	if client == nil {
+		client = &http.Client{
+			Timeout: 10 * time.Second,
+		}
+	}
+
 	return &Handler{
 		targetURL: targetURL,
 		logSvc:    logSvc,
-		client: &http.Client{
-			Timeout: 10 * time.Second,
-		},
+		client:    client,
 	}
 }
 

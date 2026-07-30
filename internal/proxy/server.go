@@ -30,7 +30,7 @@ func NewServer(port int, targetURL string, logSvc log.Logger) *Server {
 }
 
 func (s *Server) Start() error {
-	handler := NewHandler(s.targetURL, s.logSvc)
+	handler := NewHandler(s.targetURL, s.logSvc, nil)
 	s.srv = &http.Server{Handler: handler}
 
 	addr := fmt.Sprintf(":%d", s.port)
