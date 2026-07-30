@@ -7,6 +7,10 @@ import (
 	"easy-proxy/internal/output"
 )
 
+type Logger interface {
+	Log(entry Entry)
+}
+
 type Service struct {
 	showHeaders bool
 	showDetails bool

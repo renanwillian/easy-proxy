@@ -3,6 +3,7 @@ package proxy
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"sync/atomic"
 	"time"
@@ -13,12 +14,13 @@ import (
 type Server struct {
 	port      int
 	targetURL string
-	logSvc    *log.Service
+	logSvc    log.Logger
 	srv       *http.Server
+	listener  net.Listener
 	running   atomic.Bool
 }
 
-func NewServer(port int, targetURL string, logSvc *log.Service) *Server {
+func NewServer(port int, targetURL string, logSvc log.Logger) *Server {
 	return &Server{
 		port:      port,
 		targetURL: sanitizeURL(targetURL),
@@ -28,12 +30,20 @@ func NewServer(port int, targetURL string, logSvc *log.Service) *Server {
 
 func (s *Server) Start() error {
 	handler := NewHandler(s.targetURL, s.logSvc)
-	s.srv = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
-		Handler: handler,
+	s.srv = &http.Server{Handler: handler}
+
+	addr := fmt.Sprintf(":%d", s.port)
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	s.listener = listener
+	if s.port == 0 {
+		s.port = listener.Addr().(*net.TCPAddr).Port
 	}
 	s.running.Store(true)
-	return s.srv.ListenAndServe()
+
+	return s.srv.Serve(listener)
 }
 
 func (s *Server) Stop() error {

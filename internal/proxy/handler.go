@@ -15,11 +15,11 @@ import (
 
 type Handler struct {
 	targetURL string
-	logSvc    *log.Service
+	logSvc    log.Logger
 	client    *http.Client
 }
 
-func NewHandler(targetURL string, logSvc *log.Service) *Handler {
+func NewHandler(targetURL string, logSvc log.Logger) *Handler {
 	return &Handler{
 		targetURL: targetURL,
 		logSvc:    logSvc,
@@ -88,14 +88,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.logSvc.Log(entry)
 }
 
-func writeError(w http.ResponseWriter, status int, msg string, entry *log.Entry, logSvc *log.Service) {
+func writeError(w http.ResponseWriter, status int, msg string, entry *log.Entry, logSvc log.Logger) {
 	entry.StatusCode = status
 	entry.ResponseMessage = msg
 	http.Error(w, msg, status)
 	logSvc.Log(*entry)
 }
 
-func handleError(w http.ResponseWriter, err error, entry *log.Entry, logSvc *log.Service) {
+func handleError(w http.ResponseWriter, err error, entry *log.Entry, logSvc log.Logger) {
 	var netErr net.Error
 	if errors.As(err, &netErr) && netErr.Timeout() {
 		writeError(w, http.StatusGatewayTimeout, "Gateway Timeout: Upstream server took too long to respond.", entry, logSvc)
