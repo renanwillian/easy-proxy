@@ -106,6 +106,7 @@ class ProxyServerTest {
                 "GET,200",
                 "POST,201",
                 "PUT,200",
+                "PATCH,200",
                 "DELETE,204",
                 "HEAD,200",
                 "OPTIONS,200"
