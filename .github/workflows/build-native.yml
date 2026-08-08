@@ -19,8 +19,10 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
-          version: '22.3.1'
-          java-version: '19'
+          version: '25.0'
+          distribution: 'graalvm'
+          java-version: '25'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install musl and dependencies
         run: |
