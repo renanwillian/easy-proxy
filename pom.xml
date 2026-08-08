@@ -56,6 +56,12 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -114,6 +120,7 @@
                         <configuration>
                             <buildArgs>
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
+                                <buildArg>-H:IncludeResources=.*easy-proxy-version.properties</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
@@ -143,6 +150,7 @@
                                 <buildArg>--enable-url-protocols=http,https</buildArg>
                                 <buildArg>--static</buildArg>
                                 <buildArg>--libc=musl</buildArg>
+                                <buildArg>-H:IncludeResources=.*easy-proxy-version.properties</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
