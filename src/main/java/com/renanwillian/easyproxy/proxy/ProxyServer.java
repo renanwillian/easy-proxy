@@ -29,7 +29,7 @@ public class ProxyServer implements AutoCloseable {
         server = HttpServer.create(new InetSocketAddress(port), 0);
         server.createContext("/", new ProxyHandler(targetUrl, logService));
 
-        executor = Executors.newCachedThreadPool();
+        executor = Executors.newVirtualThreadPerTaskExecutor();
         server.setExecutor(executor);
 
         server.start();
