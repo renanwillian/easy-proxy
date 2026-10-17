@@ -1,8 +1,22 @@
 package com.renanwillian.easyproxy.utils;
 
+import java.util.List;
+import java.util.Map;
+
 public class HttpUtils {
 
     private HttpUtils() {}
+
+    /** Returns the first value of a header, matching the name case-insensitively, or null. */
+    public static String firstHeaderValue(Map<String, List<String>> headers, String name) {
+        if (headers == null) return null;
+        for (Map.Entry<String, List<String>> entry : headers.entrySet()) {
+            if (name.equalsIgnoreCase(entry.getKey()) && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                return entry.getValue().get(0);
+            }
+        }
+        return null;
+    }
 
     public static String getStatusText(int statusCode) {
         return switch (statusCode) {

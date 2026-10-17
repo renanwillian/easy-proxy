@@ -1,10 +1,8 @@
 package com.renanwillian.easyproxy.log;
 
 import com.renanwillian.easyproxy.utils.AnsiUtils;
-import com.renanwillian.easyproxy.utils.GzipUtils;
 import com.renanwillian.easyproxy.utils.TerminalUtils;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -13,12 +11,23 @@ public class LogService {
     public static final String BREAK = "\n";
     private static final String SEPARATOR = "-------------------------------------------------------------";
 
+    public static final int DEFAULT_MAX_BODY_SIZE = 4096;
+
     private final boolean showHeaders;
     private final boolean showDetails;
+    private final BodyFormatter bodyFormatter;
 
     public LogService(boolean showHeaders, boolean showDetails) {
+        this(showHeaders, showDetails, DEFAULT_MAX_BODY_SIZE);
+    }
+
+    /**
+     * @param maxBodySize maximum number of body bytes to print; 0 means no limit.
+     */
+    public LogService(boolean showHeaders, boolean showDetails, int maxBodySize) {
         this.showHeaders = showHeaders;
         this.showDetails = showDetails;
+        this.bodyFormatter = new BodyFormatter(maxBodySize);
     }
 
     public void log(LogEntry logEntry) {
@@ -77,26 +86,7 @@ public class LogService {
     private void appendBody(StringBuilder sb, String label, byte[] body, Map<String, List<String>> headers) {
         if (body == null) return;
         appendLabel(sb, label);
-        sb.append(AnsiUtils.colorize(getBodyAsString(body, headers), AnsiUtils.WHITE));
+        sb.append(AnsiUtils.colorize(bodyFormatter.format(body, headers), AnsiUtils.WHITE));
         sb.append(BREAK);
-    }
-
-    private String getBodyAsString(byte[] body, Map<String, List<String>> headers) {
-        if (body == null) return "(empty)";
-        String contentEncoding = firstHeaderValue(headers, "Content-Encoding");
-        try {
-            return new String(GzipUtils.uncompressIfGzipped(body, contentEncoding));
-        } catch (IOException e) {
-            return "(error decompressing body) " + new String(body);
-        }
-    }
-
-    private static String firstHeaderValue(Map<String, List<String>> headers, String name) {
-        if (headers == null) return null;
-        return headers.entrySet().stream()
-                      .filter(e -> name.equalsIgnoreCase(e.getKey()) && e.getValue() != null && !e.getValue().isEmpty())
-                      .map(e -> e.getValue().get(0))
-                      .findFirst()
-                      .orElse(null);
     }
 }

@@ -43,6 +43,10 @@ public class EasyProxy implements Callable<Integer> {
     @Option(names = {"--headers"}, description = "Show the headers of each request / response (default: false).")
     private boolean headers = false;
 
+    @Option(names = {"--max-body-size"}, paramLabel = "<bytes>",
+            description = "Maximum number of body bytes shown with --details; 0 means no limit (default: 4096).")
+    private int maxBodySize = LogService.DEFAULT_MAX_BODY_SIZE;
+
     @Parameters(paramLabel = "TARGET_URL", description = "The target URL for the proxy.")
     private String targetUrl;
 
@@ -53,8 +57,8 @@ public class EasyProxy implements Callable<Integer> {
 
     @Override
     public Integer call() {
-        LogService logService = new LogService(headers, details);
         validateOptions();
+        LogService logService = new LogService(headers, details, maxBodySize);
 
         ProxyConfig config = ProxyConfig.of(port, targetUrl)
                                         .withHost(host)
@@ -88,6 +92,9 @@ public class EasyProxy implements Callable<Integer> {
         }
         if (timeoutSeconds <= 0) {
             throw new ParameterException(spec.commandLine(), "Invalid timeout: " + timeoutSeconds + ". It must be greater than zero.");
+        }
+        if (maxBodySize < 0) {
+            throw new ParameterException(spec.commandLine(), "Invalid max body size: " + maxBodySize + ". It must be zero or greater.");
         }
         try {
             targetUrl = UrlUtils.sanitizeUrl(targetUrl);

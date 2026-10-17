@@ -20,7 +20,8 @@ easy-proxy --version
 ## 📖 Usage
 ```text
 $ easy-proxy --help
-Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>] [--port=<port>]
+Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>]
+                  [--max-body-size=<bytes>] [--port=<port>]
                   [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
 
@@ -29,6 +30,9 @@ Starts a reverse proxy server.
   --headers         Show the headers of each request/response (default: false).
   --host=<host>     The address the server binds to. Use 0.0.0.0 to accept
                       connections from other machines (default: 127.0.0.1).
+  --max-body-size=<bytes>
+                    Maximum number of body bytes shown with --details; 0
+                      means no limit (default: 4096).
   --port=<port>     The port on which the server will run (default: 8000).
   --timeout=<seconds>
                     How long to wait for the target to start responding
