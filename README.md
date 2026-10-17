@@ -5,11 +5,18 @@ A dead-simple CLI tool that instantly maps external servers to your localhost.
 Fast, elegant, and perfect for modern development workflows.
 
 ## 📦 Installation
-> Note: easy-proxy is currently available only for Linux systems (x86_64 architecture).
+Pre-built binaries are available for Linux (x86_64 and aarch64) and macOS (Apple Silicon).
 
-You can install it easily by running the following commands:
+Install the latest release by running the command for your platform:
 ```bash
+# Linux x86_64
 curl -sL "https://github.com/renanwillian/easy-proxy/releases/latest/download/easy-proxy-linux-x86_64.tar.gz" | tar -xz && sudo install -D easy-proxy -t /usr/local/bin/
+
+# Linux aarch64
+curl -sL "https://github.com/renanwillian/easy-proxy/releases/latest/download/easy-proxy-linux-aarch64.tar.gz" | tar -xz && sudo install -D easy-proxy -t /usr/local/bin/
+
+# macOS (Apple Silicon)
+curl -sL "https://github.com/renanwillian/easy-proxy/releases/latest/download/easy-proxy-macos-aarch64.tar.gz" | tar -xz && sudo install easy-proxy /usr/local/bin/
 ```
 
 Confirm that easy-proxy was installed correctly by checking the version:

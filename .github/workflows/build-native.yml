@@ -10,7 +10,25 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Fully static binary, runs on any x86_64 Linux distribution.
+          - os: ubuntu-latest
+            profile: native-musl
+            musl: true
+            asset: easy-proxy-linux-x86_64.tar.gz
+          - os: ubuntu-24.04-arm
+            profile: native
+            musl: false
+            asset: easy-proxy-linux-aarch64.tar.gz
+          - os: macos-15
+            profile: native
+            musl: false
+            asset: easy-proxy-macos-aarch64.tar.gz
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -25,6 +43,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install musl and dependencies
+        if: matrix.musl
         env:
           ZLIB_VERSION: 1.3.1
           ZLIB_SHA256: 9a93b2b7dfdac77ceba5a558a580e74667dd6fede4585b91eefb60f03b72df23
@@ -42,17 +61,36 @@ jobs:
           sudo make install
           sudo ln -s /usr/local/musl/lib/libz.a /usr/lib/x86_64-linux-musl/libz.a
 
-      - name: Build native image with Maven and musl
-        run: |
-          ./mvnw -Pnative-musl package
+      - name: Build native image
+        run: ./mvnw -B -P${{ matrix.profile }} package
+
+      - name: Smoke test binary
+        run: ./target/easy-proxy --version
 
       - name: Compress binary
-        run: |
-          tar -czvf easy-proxy-linux-x86_64.tar.gz -C target easy-proxy
+        run: tar -czvf ${{ matrix.asset }} -C target easy-proxy
 
-      - name: Create release and attach artifact
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Create release and attach artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: easy-proxy-linux-x86_64.tar.gz
+          files: dist/*.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
