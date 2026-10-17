@@ -65,7 +65,7 @@ public class ProxyHandler implements HttpHandler {
             log.setStatusCode(response.statusCode());
             log.setResponseMessage(HttpUtils.getStatusText(response.statusCode()));
 
-            Map<String, String> responseHeaders = getResponseHeaders(response);
+            Map<String, List<String>> responseHeaders = getResponseHeaders(response);
             forwardResponseHeaders(exchange, responseHeaders);
 
             byte[] responseBody = response.body();
@@ -88,9 +88,9 @@ public class ProxyHandler implements HttpHandler {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(fullTargetUrl))
                                                  .timeout(REQUEST_TIMEOUT);
 
-        getRequestHeaders(exchange).forEach((name, value) -> {
+        exchange.getRequestHeaders().forEach((name, values) -> {
             if (!RESTRICTED_HEADERS.contains(name.toLowerCase())) {
-                builder.header(name, value);
+                values.forEach(value -> builder.header(name, value));
             }
         });
 
@@ -101,8 +101,8 @@ public class ProxyHandler implements HttpHandler {
         return builder.method(exchange.getRequestMethod(), bodyPublisher).build();
     }
 
-    private static void forwardResponseHeaders(HttpExchange exchange, Map<String, String> responseHeaders) {
-        responseHeaders.forEach(exchange.getResponseHeaders()::add);
+    private static void forwardResponseHeaders(HttpExchange exchange, Map<String, List<String>> responseHeaders) {
+        responseHeaders.forEach((name, values) -> values.forEach(value -> exchange.getResponseHeaders().add(name, value)));
     }
 
     private static boolean hasRequestBody(HttpExchange exchange) {
@@ -132,19 +132,17 @@ public class ProxyHandler implements HttpHandler {
         return byteArrayOutputStream.toByteArray();
     }
 
-    private Map<String, String> getRequestHeaders(HttpExchange exchange) {
-        Map<String, String> headers = new HashMap<>();
-        exchange.getRequestHeaders().forEach((k, v) -> headers.put(k, String.join(",", v)));
+    private Map<String, List<String>> getRequestHeaders(HttpExchange exchange) {
+        Map<String, List<String>> headers = new HashMap<>();
+        exchange.getRequestHeaders().forEach((k, v) -> headers.put(k, List.copyOf(v)));
         return headers;
     }
 
-    private Map<String, String> getResponseHeaders(HttpResponse<byte[]> response) {
-        Map<String, List<String>> headers = response.headers().map();
-        if (headers == null) return Map.of();
-        Map<String, String> responseHeaders = new HashMap<>();
-        headers.forEach((key, value) -> {
+    private Map<String, List<String>> getResponseHeaders(HttpResponse<byte[]> response) {
+        Map<String, List<String>> responseHeaders = new HashMap<>();
+        response.headers().map().forEach((key, value) -> {
             if (key != null && value != null && !RESPONSE_FRAMING_HEADERS.contains(key.toLowerCase())) {
-                responseHeaders.put(key, String.join(",", value));
+                responseHeaders.put(key, List.copyOf(value));
             }
         });
         return responseHeaders;

@@ -22,6 +22,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -122,6 +124,38 @@ class ProxyServerTest {
 
             assertEquals(expectedStatusCode, response.statusCode());
             assertEquals(responseBody, response.body());
+        }
+    }
+
+    @Nested
+    @DisplayName("Header Forwarding Tests")
+    class HeaderForwardingTests {
+        @Test
+        @DisplayName("Should forward each Set-Cookie header separately")
+        void shouldForwardMultipleSetCookieHeadersSeparately() throws Exception {
+            mockServer.addEndpoint("/cookies", "GET", 200, "ok".getBytes(),
+                    Map.of("Set-Cookie", List.of("a=1; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT", "b=2; Path=/")));
+            mockServer.start();
+
+            HttpResponse<String> response = sendRequestToProxyServer("/cookies", "GET");
+
+            assertEquals(List.of("a=1; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT", "b=2; Path=/"),
+                    response.headers().allValues("Set-Cookie"));
+        }
+
+        @Test
+        @DisplayName("Should forward repeated request headers as separate values")
+        void shouldForwardRepeatedRequestHeaders() throws Exception {
+            startMockServer(200, "GET", "/echo", "ok");
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/echo"))
+                                             .header("X-Custom", "one")
+                                             .header("X-Custom", "two")
+                                             .GET()
+                                             .build();
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(List.of("one", "two"), mockServer.getLastRequestHeaders().get("X-Custom"));
         }
     }
 

@@ -1,6 +1,7 @@
 package com.renanwillian.easyproxy.log;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 public class LogEntry {
@@ -11,9 +12,9 @@ public class LogEntry {
     private String responseMessage;
     private Long duration;
     private LocalDateTime timestamp;
-    private Map<String, String> requestHeaders;
+    private Map<String, List<String>> requestHeaders;
     private byte[] requestBody;
-    private Map<String, String> responseHeaders;
+    private Map<String, List<String>> responseHeaders;
     private byte[] responseBody;
 
     public String getMethod() {
@@ -64,11 +65,11 @@ public class LogEntry {
         this.timestamp = timestamp;
     }
 
-    public Map<String, String> getRequestHeaders() {
+    public Map<String, List<String>> getRequestHeaders() {
         return requestHeaders;
     }
 
-    public void setRequestHeaders(Map<String, String> requestHeaders) {
+    public void setRequestHeaders(Map<String, List<String>> requestHeaders) {
         this.requestHeaders = requestHeaders;
     }
 
@@ -80,11 +81,11 @@ public class LogEntry {
         this.requestBody = requestBody;
     }
 
-    public Map<String, String> getResponseHeaders() {
+    public Map<String, List<String>> getResponseHeaders() {
         return responseHeaders;
     }
 
-    public void setResponseHeaders(Map<String, String> responseHeaders) {
+    public void setResponseHeaders(Map<String, List<String>> responseHeaders) {
         this.responseHeaders = responseHeaders;
     }
 

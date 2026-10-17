@@ -5,6 +5,7 @@ import com.renanwillian.easyproxy.utils.GzipUtils;
 import com.renanwillian.easyproxy.utils.TerminalUtils;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 public class LogService {
@@ -41,7 +42,7 @@ public class LogService {
             sb.append(BREAK);
             if (showHeaders && logEntry.getRequestHeaders() != null) {
                 sb.append(AnsiUtils.colorize("Headers: ", AnsiUtils.WHITE_BOLD));
-                logEntry.getRequestHeaders().forEach((k, v) -> sb.append(AnsiUtils.colorize("\n  " + k + ": " + v, AnsiUtils.WHITE)));
+                logEntry.getRequestHeaders().forEach((k, values) -> values.forEach(v -> sb.append(AnsiUtils.colorize("\n  " + k + ": " + v, AnsiUtils.WHITE))));
                 sb.append(BREAK);
             }
 
@@ -61,9 +62,10 @@ public class LogService {
         TerminalUtils.println(sb.toString());
     }
 
-    private String getBodyAsString(byte[] body, Map<String, String> headers) {
+    private String getBodyAsString(byte[] body, Map<String, List<String>> headers) {
         if (body == null) return "(empty)";
-        String contentEncoding = headers != null ? headers.getOrDefault("Content-Encoding", null) : null;
+        List<String> encodings = headers != null ? headers.get("Content-Encoding") : null;
+        String contentEncoding = encodings != null && !encodings.isEmpty() ? encodings.get(0) : null;
         try {
             return new String(GzipUtils.uncompressIfGzipped(body, contentEncoding));
         } catch (IOException e) {
