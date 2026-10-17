@@ -200,6 +200,31 @@ class ProxyServerTest {
     }
 
     @Nested
+    @DisplayName("Redirect Tests")
+    class RedirectTests {
+        @ParameterizedTest
+        @CsvSource({
+                // upstream Location,                   expected Location seen by the client
+                "http://localhost:9999/next?x=1,        http://localhost:8888/next?x=1",
+                "HTTP://LOCALHOST:9999/next,            http://localhost:8888/next",
+                "http://localhost:9999,                 http://localhost:8888",
+                "http://localhost:99999/elsewhere,      http://localhost:99999/elsewhere",
+                "https://other.example.com/next,        https://other.example.com/next",
+                "/relative/path,                        /relative/path",
+        })
+        @DisplayName("Should point redirects to the target back at the proxy")
+        void shouldRewriteLocationHeaders(String upstreamLocation, String expectedLocation) throws Exception {
+            mockServer.addEndpoint("/redirect", "GET", 302, new byte[0], Map.of("Location", List.of(upstreamLocation)));
+            mockServer.start();
+
+            HttpResponse<String> response = sendRequestToProxyServer("/redirect", "GET");
+
+            assertEquals(302, response.statusCode());
+            assertEquals(expectedLocation, response.headers().firstValue("Location").orElse(null));
+        }
+    }
+
+    @Nested
     @DisplayName("Streaming Tests")
     class StreamingTests {
         @Test

@@ -69,6 +69,7 @@ public class ProxyHandler implements HttpHandler {
                 log.setResponseMessage(HttpUtils.getStatusText(response.statusCode()));
 
                 Map<String, List<String>> responseHeaders = getResponseHeaders(response);
+                rewriteLocation(exchange, responseHeaders);
                 log.setResponseHeaders(responseHeaders);
                 forwardResponseHeaders(exchange, responseHeaders);
 
@@ -128,6 +129,33 @@ public class ProxyHandler implements HttpHandler {
         List<String> transferEncoding = exchange.getRequestHeaders().get("Transfer-Encoding");
         return transferEncoding != null
                 && transferEncoding.stream().anyMatch(v -> v.toLowerCase(Locale.ROOT).contains("chunked"));
+    }
+
+    /**
+     * Points redirects to the target back at the proxy, so that the client keeps going through it. For example,
+     * with target {@code https://api.example.com/v1}, {@code Location: https://api.example.com/v1/login} becomes
+     * {@code http://localhost:8000/login}. Relative and external locations are left untouched.
+     */
+    private void rewriteLocation(HttpExchange exchange, Map<String, List<String>> responseHeaders) {
+        List<String> locations = responseHeaders.get("Location");
+        if (locations == null || locations.isEmpty()) return;
+
+        String proxyOrigin = "http://" + proxyAuthority(exchange);
+        responseHeaders.put("Location", locations.stream().map(location -> rewriteUrl(location, proxyOrigin)).toList());
+    }
+
+    private String rewriteUrl(String location, String proxyOrigin) {
+        if (!location.regionMatches(true, 0, targetUrl, 0, targetUrl.length())) return location;
+
+        String rest = location.substring(targetUrl.length());
+        if (!rest.isEmpty() && "/?#".indexOf(rest.charAt(0)) < 0) return location; // e.g. /v10 for target /v1
+        return proxyOrigin + rest;
+    }
+
+    private static String proxyAuthority(HttpExchange exchange) {
+        String host = exchange.getRequestHeaders().getFirst("Host");
+        if (host != null && !host.isBlank()) return host.strip();
+        return "localhost:" + exchange.getLocalAddress().getPort();
     }
 
     private static void forwardResponseHeaders(HttpExchange exchange, Map<String, List<String>> responseHeaders) {
