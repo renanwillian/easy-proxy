@@ -27,10 +27,14 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -38,7 +42,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
@@ -50,15 +53,13 @@ import static org.mockito.Mockito.verify;
 @ExtendWith(MockitoExtension.class)
 class ProxyServerTest {
 
-    private static final int MOCK_SERVER_PORT = 9999;
-    private static final int PROXY_SERVER_PORT = 8888;
-    private static final String TARGET_URL = "http://localhost:" + MOCK_SERVER_PORT;
-    private static final String PROXY_URL = "http://localhost:" + PROXY_SERVER_PORT;
     private static final Duration CLIENT_TIMEOUT = Duration.ofMillis(500);
 
     private ProxyServer proxyServer;
     private MockServer mockServer;
     private HttpClient httpClient;
+    private String targetUrl;
+    private String proxyUrl;
 
     @Mock
     private LogService logService;
@@ -66,9 +67,13 @@ class ProxyServerTest {
     @BeforeEach
     void setUp() throws IOException {
         lenient().when(logService.bodyCaptureLimit()).thenReturn(Integer.MAX_VALUE);
-        mockServer = new MockServer(MOCK_SERVER_PORT);
-        proxyServer = new ProxyServer(ProxyConfig.of(PROXY_SERVER_PORT, TARGET_URL), logService);
+        mockServer = new MockServer();
+        mockServer.start();
+        targetUrl = mockServer.getUrl();
+
+        proxyServer = new ProxyServer(ProxyConfig.of(0, targetUrl), logService);
         proxyServer.start();
+        proxyUrl = "http://localhost:" + proxyServer.getPort();
 
         httpClient = HttpClient.newBuilder()
                                .connectTimeout(CLIENT_TIMEOUT)
@@ -81,14 +86,13 @@ class ProxyServerTest {
         if (proxyServer != null && proxyServer.isRunning()) proxyServer.stop();
     }
 
-    protected void startMockServer(int statusCode, String method, String path, String responseBody) throws IOException {
+    private void addMockEndpoint(int statusCode, String method, String path, String responseBody) {
         mockServer.addEndpoint(path, method, statusCode, responseBody);
-        mockServer.start();
     }
 
-    protected HttpResponse<String> sendRequestToProxyServer(String path, String method) throws IOException, InterruptedException {
+    private HttpResponse<String> sendRequestToProxyServer(String path, String method) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
-                                         .uri(URI.create(PROXY_URL + path))
+                                         .uri(URI.create(proxyUrl + path))
                                          .method(method, HttpRequest.BodyPublishers.noBody())
                                          .build();
         return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -129,7 +133,7 @@ class ProxyServerTest {
             String path = "/api";
             String responseBody = expectedStatusCode != 204 && !method.equals("HEAD") ? "ok" : "";
 
-            startMockServer(expectedStatusCode, method, path, responseBody);
+            addMockEndpoint(expectedStatusCode, method, path, responseBody);
 
             HttpResponse<String> response = sendRequestToProxyServer(path, method);
 
@@ -146,7 +150,6 @@ class ProxyServerTest {
         void shouldForwardMultipleSetCookieHeadersSeparately() throws Exception {
             mockServer.addEndpoint("/cookies", "GET", 200, "ok".getBytes(),
                     Map.of("Set-Cookie", List.of("a=1; Path=/; Expires=Wed, 21 Oct 2026 07:28:00 GMT", "b=2; Path=/")));
-            mockServer.start();
 
             HttpResponse<String> response = sendRequestToProxyServer("/cookies", "GET");
 
@@ -157,9 +160,9 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should forward repeated request headers as separate values")
         void shouldForwardRepeatedRequestHeaders() throws Exception {
-            startMockServer(200, "GET", "/echo", "ok");
+            addMockEndpoint(200, "GET", "/echo", "ok");
 
-            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/echo"))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(proxyUrl + "/echo"))
                                              .header("X-Custom", "one")
                                              .header("X-Custom", "two")
                                              .GET()
@@ -173,7 +176,7 @@ class ProxyServerTest {
     @Test
     @DisplayName("Should not use chunked encoding for empty responses")
     void shouldNotUseChunkedEncodingForEmptyResponses() throws Exception {
-        startMockServer(200, "GET", "/empty", "");
+        addMockEndpoint(200, "GET", "/empty", "");
 
         HttpResponse<String> response = sendRequestToProxyServer("/empty", "GET");
 
@@ -188,9 +191,8 @@ class ProxyServerTest {
     @DisplayName("Should return Gateway Timeout when upstream exceeds the configured timeout")
     void shouldReturnGatewayTimeoutWhenUpstreamIsTooSlow() throws Exception {
         mockServer.addSlowEndpoint("/slow", "GET", Duration.ofSeconds(2));
-        mockServer.start();
 
-        ProxyConfig config = ProxyConfig.of(0, TARGET_URL).withTimeout(Duration.ofMillis(200));
+        ProxyConfig config = ProxyConfig.of(0, targetUrl).withTimeout(Duration.ofMillis(200));
         try (ProxyServer server = new ProxyServer(config, logService)) {
             server.start();
             HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + "/slow")).build();
@@ -207,22 +209,22 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should add X-Forwarded-* headers")
         void shouldAddForwardedHeaders() throws Exception {
-            startMockServer(200, "GET", "/fwd", "ok");
+            addMockEndpoint(200, "GET", "/fwd", "ok");
 
             sendRequestToProxyServer("/fwd", "GET");
 
             var received = mockServer.getLastRequestHeaders();
             assertEquals("127.0.0.1", received.getFirst("X-Forwarded-For"));
-            assertEquals("localhost:" + PROXY_SERVER_PORT, received.getFirst("X-Forwarded-Host"));
+            assertEquals("localhost:" + proxyServer.getPort(), received.getFirst("X-Forwarded-Host"));
             assertEquals("http", received.getFirst("X-Forwarded-Proto"));
         }
 
         @Test
         @DisplayName("Should extend an existing X-Forwarded-For chain")
         void shouldExtendExistingForwardedFor() throws Exception {
-            startMockServer(200, "GET", "/fwd", "ok");
+            addMockEndpoint(200, "GET", "/fwd", "ok");
 
-            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/fwd"))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(proxyUrl + "/fwd"))
                                              .header("X-Forwarded-For", "203.0.113.7")
                                              .header("X-Forwarded-Proto", "https")
                                              .build();
@@ -236,18 +238,18 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should not forward hop-by-hop request headers")
         void shouldNotForwardHopByHopRequestHeaders() throws Exception {
-            startMockServer(200, "GET", "/hop", "ok");
+            addMockEndpoint(200, "GET", "/hop", "ok");
 
             // HttpClient refuses to send Connection, so write the request by hand.
             String rawRequest = "GET /hop HTTP/1.1\r\n"
-                    + "Host: localhost:" + PROXY_SERVER_PORT + "\r\n"
+                    + "Host: localhost:" + proxyServer.getPort() + "\r\n"
                     + "Connection: close, X-Internal\r\n"
                     + "X-Internal: secret\r\n"
                     + "Keep-Alive: timeout=5\r\n"
                     + "Proxy-Authorization: Basic abc\r\n"
                     + "X-Kept: yes\r\n"
                     + "\r\n";
-            try (Socket socket = new Socket("localhost", PROXY_SERVER_PORT)) {
+            try (Socket socket = new Socket("localhost", proxyServer.getPort())) {
                 socket.getOutputStream().write(rawRequest.getBytes(StandardCharsets.US_ASCII));
                 socket.getInputStream().readAllBytes();
             }
@@ -267,7 +269,6 @@ class ProxyServerTest {
                     "X-Internal", List.of("secret"),
                     "Proxy-Authenticate", List.of("Basic"),
                     "X-Kept", List.of("yes")));
-            mockServer.start();
 
             HttpResponse<String> response = sendRequestToProxyServer("/hop", "GET");
 
@@ -282,24 +283,31 @@ class ProxyServerTest {
     class RedirectTests {
         @ParameterizedTest
         @CsvSource({
-                // upstream Location,                   expected Location seen by the client
-                "http://localhost:9999/next?x=1,        http://localhost:8888/next?x=1",
-                "HTTP://LOCALHOST:9999/next,            http://localhost:8888/next",
-                "http://localhost:9999,                 http://localhost:8888",
-                "http://localhost:99999/elsewhere,      http://localhost:99999/elsewhere",
-                "https://other.example.com/next,        https://other.example.com/next",
-                "/relative/path,                        /relative/path",
+                // upstream Location,              expected Location seen by the client
+                "{target}/next?x=1,                {proxy}/next?x=1",
+                "{TARGET}/next,                    {proxy}/next",
+                "{target},                         {proxy}",
+                "{target}9/elsewhere,              {target}9/elsewhere",
+                "https://other.example.com/next,   https://other.example.com/next",
+                "/relative/path,                   /relative/path",
         })
         @DisplayName("Should point redirects to the target back at the proxy")
-        void shouldRewriteLocationHeaders(String upstreamLocation, String expectedLocation) throws Exception {
+        void shouldRewriteLocationHeaders(String upstreamTemplate, String expectedTemplate) throws Exception {
+            String upstreamLocation = fillUrls(upstreamTemplate);
+            String expectedLocation = fillUrls(expectedTemplate);
             mockServer.addEndpoint("/redirect", "GET", 302, new byte[0], Map.of("Location", List.of(upstreamLocation)));
-            mockServer.start();
 
             HttpResponse<String> response = sendRequestToProxyServer("/redirect", "GET");
 
             assertEquals(302, response.statusCode());
             assertEquals(expectedLocation, response.headers().firstValue("Location").orElse(null));
         }
+    }
+
+    private String fillUrls(String template) {
+        return template.replace("{target}", targetUrl)
+                       .replace("{TARGET}", targetUrl.toUpperCase())
+                       .replace("{proxy}", proxyUrl);
     }
 
     @Nested
@@ -310,9 +318,8 @@ class ProxyServerTest {
         void shouldStreamChunksWithoutWaitingForTheWholeBody() throws Exception {
             Duration interval = Duration.ofMillis(1500);
             mockServer.addStreamingEndpoint("/events", List.of("data: first\n\n", "data: second\n\n"), interval);
-            mockServer.start();
 
-            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/events")).build();
+            HttpRequest request = HttpRequest.newBuilder(URI.create(proxyUrl + "/events")).build();
             long start = System.nanoTime();
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
@@ -332,11 +339,10 @@ class ProxyServerTest {
             byte[] largeBody = new byte[5 * 1024 * 1024];
             new Random(42).nextBytes(largeBody);
             mockServer.addEndpoint("/download", "GET", 200, largeBody, Map.of("Content-Type", List.of("application/octet-stream")));
-            mockServer.start();
 
             LogService limitedLog = mock(LogService.class);
             when(limitedLog.bodyCaptureLimit()).thenReturn(1024);
-            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL), limitedLog)) {
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, targetUrl), limitedLog)) {
                 server.start();
                 HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + "/download")).build();
 
@@ -358,9 +364,9 @@ class ProxyServerTest {
         void shouldStreamRequestBodiesKeepingContentLength() throws Exception {
             byte[] upload = new byte[2 * 1024 * 1024];
             new Random(7).nextBytes(upload);
-            startMockServer(201, "POST", "/upload", "stored");
+            addMockEndpoint(201, "POST", "/upload", "stored");
 
-            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/upload"))
+            HttpRequest request = HttpRequest.newBuilder(URI.create(proxyUrl + "/upload"))
                                              .POST(HttpRequest.BodyPublishers.ofByteArray(upload))
                                              .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
@@ -374,7 +380,6 @@ class ProxyServerTest {
         @DisplayName("Should keep upstream Content-Length on HEAD responses")
         void shouldKeepContentLengthOnHeadResponses() throws Exception {
             mockServer.addEndpoint("/file", "HEAD", 200, new byte[0], Map.of("Content-Length", List.of("1234")));
-            mockServer.start();
 
             HttpResponse<String> response = sendRequestToProxyServer("/file", "HEAD");
 
@@ -389,7 +394,7 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should bind to loopback by default")
         void shouldBindToLoopbackByDefault() throws Exception {
-            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL), logService)) {
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, targetUrl), logService)) {
                 server.start();
                 assertTrue(server.getAddress().getAddress().isLoopbackAddress());
             }
@@ -398,7 +403,7 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should bind to the configured host")
         void shouldBindToConfiguredHost() throws Exception {
-            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL).withHost("0.0.0.0"), logService)) {
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, targetUrl).withHost("0.0.0.0"), logService)) {
                 server.start();
                 assertTrue(server.getAddress().getAddress().isAnyLocalAddress());
             }
@@ -411,6 +416,8 @@ class ProxyServerTest {
         @Test
         @DisplayName("Should return Bad Gateway when upstream server is unavailable")
         void shouldReturnBadGatewayWhenUpstreamServerIsUnavailable() throws Exception {
+            mockServer.stop();
+
             HttpResponse<String> response = sendRequestToProxyServer("/unavailable", "GET");
 
             assertEquals(502, response.statusCode());
@@ -424,46 +431,13 @@ class ProxyServerTest {
             String path = "/error";
             String errorMessage = "Error message";
 
-            startMockServer(errorStatusCode, "GET", path, errorMessage);
+            addMockEndpoint(errorStatusCode, "GET", path, errorMessage);
 
             HttpResponse<String> response = sendRequestToProxyServer(path, "GET");
 
             assertEquals(errorStatusCode, response.statusCode());
             assertEquals(errorMessage, response.body());
         }
-    }
-
-    @Test
-    void testProxyForwardsPostRequests() throws IOException, InterruptedException {
-        CountDownLatch latch = new CountDownLatch(1);
-        doAnswer(invocation -> {
-            latch.countDown();
-            return null;
-        }).when(logService).log(any());
-
-        int statusCode = 201;
-        String method = "POST";
-        String path = "/api";
-        String responseBody = "{}";
-
-        startMockServer(statusCode, method, path, responseBody);
-
-        HttpResponse<String> response = sendRequestToProxyServer(path, method);
-        assertEquals(statusCode, response.statusCode());
-        assertEquals(responseBody, response.body());
-
-        boolean logHappened = latch.await(2, TimeUnit.SECONDS);
-        assertTrue(logHappened);
-
-        ArgumentCaptor<LogEntry> logEntryCaptor = ArgumentCaptor.forClass(LogEntry.class);
-        verify(logService).log(logEntryCaptor.capture());
-
-        LogEntry capturedEntry = logEntryCaptor.getValue();
-        assertNotNull(capturedEntry);
-        assertEquals(method, capturedEntry.method());
-        assertEquals(path, capturedEntry.path());
-        assertEquals(statusCode, capturedEntry.statusCode());
-        assertEquals(responseBody, new String(capturedEntry.responseBody()));
     }
 
     @Nested
@@ -484,10 +458,10 @@ class ProxyServerTest {
             String responseBody = "{}";
             String requestBody = "{\"test\":\"data\"}";
 
-            startMockServer(statusCode, method, path, responseBody);
+            addMockEndpoint(statusCode, method, path, responseBody);
 
             HttpRequest request = HttpRequest.newBuilder()
-                                             .uri(URI.create(PROXY_URL + path))
+                                             .uri(URI.create(proxyUrl + path))
                                              .header("Content-Type", "application/json")
                                              .method(method, HttpRequest.BodyPublishers.ofString(requestBody))
                                              .build();
@@ -520,6 +494,7 @@ class ProxyServerTest {
                 latch.countDown();
                 return null;
             }).when(logService).log(any());
+            mockServer.stop();
 
             sendRequestToProxyServer("/unavailable", "GET");
 
@@ -545,38 +520,35 @@ class ProxyServerTest {
         @DisplayName("Should handle concurrent requests")
         void shouldHandleConcurrentRequests() throws Exception {
             int concurrentRequests = 10;
-            CountDownLatch requestsCompleted = new CountDownLatch(concurrentRequests);
+            addMockEndpoint(200, "GET", "/concurrent", "ok");
 
-            startMockServer(200, "GET", "/concurrent", "ok");
-
-            for (int i = 0; i < concurrentRequests; i++) {
-                new Thread(() -> {
-                    try {
-                        HttpResponse<String> response = sendRequestToProxyServer("/concurrent", "GET");
-                        assertEquals(200, response.statusCode());
-                        assertEquals("ok", response.body());
-                    } catch (Exception e) {
-                        fail("Exception during concurrent request: " + e.getMessage());
-                    } finally {
-                        requestsCompleted.countDown();
-                    }
-                }).start();
+            List<Future<HttpResponse<String>>> futures = new ArrayList<>();
+            try (ExecutorService executor = Executors.newFixedThreadPool(concurrentRequests)) {
+                for (int i = 0; i < concurrentRequests; i++) {
+                    futures.add(executor.submit(() -> sendRequestToProxyServer("/concurrent", "GET")));
+                }
+                // get() rethrows failures from the worker threads, so they fail this test.
+                for (Future<HttpResponse<String>> future : futures) {
+                    HttpResponse<String> response = future.get(5, TimeUnit.SECONDS);
+                    assertEquals(200, response.statusCode());
+                    assertEquals("ok", response.body());
+                }
             }
-
-            boolean allRequestsCompleted = requestsCompleted.await(5, TimeUnit.SECONDS);
-            assertTrue(allRequestsCompleted, "All concurrent requests should complete within timeout");
         }
     }
 
     @Test
     @DisplayName("Should close connection with AutoCloseable")
     void testAutoCloseableImplementation() throws Exception {
-        try (ProxyServer autoCloseableServer = new ProxyServer(ProxyConfig.of(8889, TARGET_URL), logService)) {
+        int port;
+        try (ProxyServer autoCloseableServer = new ProxyServer(ProxyConfig.of(0, targetUrl), logService)) {
             autoCloseableServer.start();
             assertTrue(autoCloseableServer.isRunning());
+            port = autoCloseableServer.getPort();
         }
 
-        try (ProxyServer newServer = new ProxyServer(ProxyConfig.of(8889, TARGET_URL), logService)) {
+        // The port must have been released by close().
+        try (ProxyServer newServer = new ProxyServer(ProxyConfig.of(port, targetUrl), logService)) {
             newServer.start();
             assertTrue(newServer.isRunning());
         }
