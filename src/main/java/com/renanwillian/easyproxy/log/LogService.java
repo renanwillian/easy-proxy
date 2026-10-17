@@ -62,6 +62,10 @@ public class LogService {
 
         sb.append(AnsiUtils.colorize(" (" + logEntry.getDuration() + "ms)", AnsiUtils.PURPLE_BOLD));
 
+        if (logEntry.getError() != null) {
+            sb.append(AnsiUtils.colorize("\n  Cause: " + logEntry.getError(), AnsiUtils.RED_BOLD));
+        }
+
         if (showDetails || showHeaders) {
             sb.append(AnsiUtils.colorize("\n" + SEPARATOR + "\n", AnsiUtils.WHITE));
 

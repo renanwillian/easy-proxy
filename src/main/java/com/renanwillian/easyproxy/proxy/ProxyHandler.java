@@ -6,6 +6,7 @@ import com.renanwillian.easyproxy.utils.HttpUtils;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 
+import javax.net.ssl.SSLException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -260,21 +261,31 @@ public class ProxyHandler implements HttpHandler {
     }
 
     private static void handleException(HttpExchange exchange, Exception e, LogEntry log) {
+        if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+        String cause = describe(e);
+        log.setError(cause);
+
         if (exchange.getResponseCode() != -1) {
             // The status line was already sent; the client sees a truncated response.
             log.setResponseMessage(log.getResponseMessage() + " (response interrupted)");
             return;
         }
 
-        int statusCode = 500;
-        String message = "Internal Server Error";
-
-        if (isConnectFailure(e)) {
+        int statusCode;
+        String message;
+        if (hasCause(e, SSLException.class)) {
+            statusCode = 502;
+            message = "Bad Gateway: TLS handshake with upstream server failed. "
+                    + "Use --insecure to accept self-signed certificates.";
+        } else if (e instanceof HttpConnectTimeoutException || hasCause(e, ConnectException.class)) {
             statusCode = 502;
             message = "Bad Gateway: Unable to connect to upstream server.";
         } else if (e instanceof HttpTimeoutException) {
             statusCode = 504;
             message = "Gateway Timeout: Upstream server took too long to respond.";
+        } else {
+            statusCode = 500;
+            message = "Internal Server Error: " + cause;
         }
 
         log.setStatusCode(statusCode);
@@ -282,19 +293,33 @@ public class ProxyHandler implements HttpHandler {
 
         try {
             byte[] responseBytes = message.getBytes(StandardCharsets.UTF_8);
-            exchange.getResponseHeaders().add("Content-Type", "text/plain; charset=UTF-8");
+            exchange.getResponseHeaders().set("Content-Type", "text/plain; charset=UTF-8");
             exchange.sendResponseHeaders(statusCode, responseBytes.length);
             exchange.getResponseBody().write(responseBytes);
-        } catch (Exception ignored) {}
+        } catch (IOException ignored) {
+            // The client went away; nothing else to do.
+        }
     }
 
-    private static boolean isConnectFailure(Exception e) {
-        if (e instanceof HttpConnectTimeoutException) return true;
-        Throwable cause = e.getCause();
-        while (cause != null) {
-            if (cause instanceof ConnectException) return true;
-            cause = cause.getCause();
+    private static boolean hasCause(Throwable e, Class<? extends Throwable> type) {
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (type.isInstance(t)) return true;
         }
         return false;
+    }
+
+    /** "Exception: message", followed by the root cause when there is a different one. */
+    static String describe(Throwable e) {
+        Throwable root = e;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String description = nameAndMessage(e);
+        return root == e ? description : description + " (caused by " + nameAndMessage(root) + ")";
+    }
+
+    private static String nameAndMessage(Throwable e) {
+        String message = e.getMessage();
+        return e.getClass().getSimpleName() + (message == null || message.isBlank() ? "" : ": " + message);
     }
 }

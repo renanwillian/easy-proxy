@@ -24,7 +24,6 @@ import java.security.KeyStore;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -94,7 +93,8 @@ class InsecureTlsTest {
     void shouldRejectSelfSignedCertificateByDefault() throws Exception {
         HttpResponse<String> response = requestThroughProxy(false);
 
-        assertNotEquals(200, response.statusCode());
+        assertEquals(502, response.statusCode());
+        assertTrue(response.body().contains("--insecure"), response.body());
     }
 
     @Test

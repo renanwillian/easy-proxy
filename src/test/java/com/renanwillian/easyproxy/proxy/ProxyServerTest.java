@@ -531,6 +531,8 @@ class ProxyServerTest {
 
             LogEntry capturedEntry = logEntryCaptor.getValue();
             assertEquals(502, capturedEntry.getStatusCode());
+            assertNotNull(capturedEntry.getError());
+            assertTrue(capturedEntry.getError().contains("ConnectException"), capturedEntry.getError());
             assertEquals("GET", capturedEntry.getMethod());
             assertEquals("/unavailable", capturedEntry.getPath());
         }

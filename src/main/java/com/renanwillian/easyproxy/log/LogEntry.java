@@ -18,6 +18,7 @@ public class LogEntry {
     private Map<String, List<String>> responseHeaders;
     private byte[] responseBody;
     private long responseBodySize;
+    private String error;
 
     public String getMethod() {
         return method;
@@ -99,6 +100,15 @@ public class LogEntry {
 
     public void setResponseBodySize(long responseBodySize) {
         this.responseBodySize = responseBodySize;
+    }
+
+    /** Why the request failed, if it did. */
+    public String getError() {
+        return error;
+    }
+
+    public void setError(String error) {
+        this.error = error;
     }
 
     public Map<String, List<String>> getResponseHeaders() {

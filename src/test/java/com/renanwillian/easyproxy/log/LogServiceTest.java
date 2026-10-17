@@ -86,6 +86,18 @@ class LogServiceTest {
     }
 
     @Test
+    void shouldShowErrorCauseEvenWithoutDetails() {
+        LogEntry entry = baseEntry();
+        entry.setStatusCode(502);
+        entry.setResponseMessage("Bad Gateway");
+        entry.setError("ConnectException: Connection refused");
+
+        String output = new LogService(false, false).format(entry);
+
+        assertTrue(output.contains("Cause: ConnectException: Connection refused"), output);
+    }
+
+    @Test
     void shouldMaskSecretsByDefault() {
         LogEntry entry = baseEntry();
         entry.setRequestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
