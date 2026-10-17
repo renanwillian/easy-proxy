@@ -8,9 +8,14 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.util.concurrent.Callable;
+
 @Command(name = "easy-proxy", mixinStandardHelpOptions = true, versionProvider = VersionProvider.class,
         description = "Starts a reverse proxy server.")
-public class EasyProxy implements Runnable {
+public class EasyProxy implements Callable<Integer> {
+
+    static final int EXIT_OK = 0;
+    static final int EXIT_ERROR = 1;
 
     @Option(names = {"--port"}, description = "The port on which the server will run (default: 8000).")
     private int port = 8000;
@@ -30,7 +35,7 @@ public class EasyProxy implements Runnable {
     }
 
     @Override
-    public void run() {
+    public Integer call() {
         LogService logService = new LogService(headers, details);
         try (ProxyServer server = new ProxyServer(port, targetUrl, logService)) {
             server.start();
@@ -39,11 +44,14 @@ public class EasyProxy implements Runnable {
             TerminalUtils.println();
 
             Thread.currentThread().join();
+            return EXIT_OK;
         } catch (InterruptedException ie) {
             Thread.currentThread().interrupt();
-            TerminalUtils.printlnError("Server start interrupted: " + ie.getMessage());
+            TerminalUtils.printlnError("Server interrupted: " + ie.getMessage());
+            return EXIT_ERROR;
         } catch (Exception e) {
             TerminalUtils.printlnError("Error starting the server: " + e.getMessage());
+            return EXIT_ERROR;
         }
     }
 }
