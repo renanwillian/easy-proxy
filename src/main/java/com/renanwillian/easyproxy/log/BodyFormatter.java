@@ -27,29 +27,43 @@ class BodyFormatter {
     }
 
     String format(byte[] body, Map<String, List<String>> headers) {
-        if (body == null || body.length == 0) return "(empty)";
+        return format(body, body == null ? 0 : body.length, headers);
+    }
 
+    /**
+     * @param captured  the beginning of the body (possibly all of it).
+     * @param totalSize the size of the whole body as sent on the wire.
+     */
+    String format(byte[] captured, long totalSize, Map<String, List<String>> headers) {
+        if (captured == null) captured = new byte[0];
+        totalSize = Math.max(totalSize, captured.length);
+        if (totalSize == 0) return "(empty)";
+        if (captured.length == 0) return "(" + totalSize + " bytes, not captured)";
+
+        boolean partial = captured.length < totalSize;
         String contentEncoding = HttpUtils.firstHeaderValue(headers, "Content-Encoding");
         if (!CompressionUtils.isSupported(contentEncoding)) {
-            return "(" + contentEncoding + "-encoded body, " + body.length + " bytes)";
+            return "(" + contentEncoding + "-encoded body, " + totalSize + " bytes)";
         }
 
         byte[] decoded;
         try {
-            decoded = CompressionUtils.decompress(body, contentEncoding);
+            decoded = CompressionUtils.decompress(captured, contentEncoding, partial);
         } catch (IOException e) {
-            return "(error decompressing " + contentEncoding + " body, " + body.length + " bytes)";
+            return "(error decompressing " + contentEncoding + " body, " + totalSize + " bytes)";
         }
 
         String contentType = HttpUtils.firstHeaderValue(headers, "Content-Type");
+        long size = partial ? totalSize : decoded.length;
         if (!isText(contentType, decoded)) {
-            return "(binary body, " + decoded.length + " bytes" + (contentType != null ? ", " + contentType : "") + ")";
+            return "(binary body, " + size + " bytes" + (contentType != null ? ", " + contentType : "") + ")";
         }
 
         Charset charset = charsetOf(contentType);
-        if (maxBodySize > 0 && decoded.length > maxBodySize) {
-            return new String(decoded, 0, maxBodySize, charset)
-                    + "... (truncated, " + decoded.length + " bytes total)";
+        boolean overLimit = maxBodySize > 0 && decoded.length > maxBodySize;
+        if (overLimit || partial) {
+            int shown = overLimit ? maxBodySize : decoded.length;
+            return new String(decoded, 0, shown, charset) + "... (truncated, " + size + " bytes total)";
         }
         return new String(decoded, charset);
     }

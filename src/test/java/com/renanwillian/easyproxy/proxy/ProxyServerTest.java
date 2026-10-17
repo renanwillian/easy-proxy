@@ -16,7 +16,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -24,9 +27,11 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -34,7 +39,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.only;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.timeout;
+import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.verify;
 
 @ExtendWith(MockitoExtension.class)
@@ -55,6 +63,7 @@ class ProxyServerTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        lenient().when(logService.bodyCaptureLimit()).thenReturn(Integer.MAX_VALUE);
         mockServer = new MockServer(MOCK_SERVER_PORT);
         proxyServer = new ProxyServer(ProxyConfig.of(PROXY_SERVER_PORT, TARGET_URL), logService);
         proxyServer.start();
@@ -191,6 +200,87 @@ class ProxyServerTest {
     }
 
     @Nested
+    @DisplayName("Streaming Tests")
+    class StreamingTests {
+        @Test
+        @DisplayName("Should deliver each chunk as soon as upstream sends it")
+        void shouldStreamChunksWithoutWaitingForTheWholeBody() throws Exception {
+            Duration interval = Duration.ofMillis(1500);
+            mockServer.addStreamingEndpoint("/events", List.of("data: first\n\n", "data: second\n\n"), interval);
+            mockServer.start();
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/events")).build();
+            long start = System.nanoTime();
+            HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body()))) {
+                assertEquals("data: first", reader.readLine());
+                Duration firstChunkAfter = Duration.ofNanos(System.nanoTime() - start);
+                assertTrue(firstChunkAfter.compareTo(interval) < 0,
+                        "First chunk took " + firstChunkAfter.toMillis() + "ms; it should not wait for the second one");
+                assertEquals("", reader.readLine());
+                assertEquals("data: second", reader.readLine());
+            }
+        }
+
+        @Test
+        @DisplayName("Should forward large bodies intact while capturing only a prefix for the log")
+        void shouldForwardLargeBodiesAndCaptureOnlyAPrefix() throws Exception {
+            byte[] largeBody = new byte[5 * 1024 * 1024];
+            new Random(42).nextBytes(largeBody);
+            mockServer.addEndpoint("/download", "GET", 200, largeBody, Map.of("Content-Type", List.of("application/octet-stream")));
+            mockServer.start();
+
+            LogService limitedLog = mock(LogService.class);
+            when(limitedLog.bodyCaptureLimit()).thenReturn(1024);
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL), limitedLog)) {
+                server.start();
+                HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + "/download")).build();
+
+                HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
+
+                assertArrayEquals(largeBody, response.body());
+                assertEquals(String.valueOf(largeBody.length), response.headers().firstValue("Content-Length").orElse(null));
+                assertTrue(response.headers().firstValue("Transfer-Encoding").isEmpty());
+
+                ArgumentCaptor<LogEntry> captor = ArgumentCaptor.forClass(LogEntry.class);
+                verify(limitedLog, timeout(2000)).log(captor.capture());
+                assertEquals(1024, captor.getValue().getResponseBody().length);
+                assertEquals(largeBody.length, captor.getValue().getResponseBodySize());
+            }
+        }
+
+        @Test
+        @DisplayName("Should stream request bodies upstream keeping Content-Length")
+        void shouldStreamRequestBodiesKeepingContentLength() throws Exception {
+            byte[] upload = new byte[2 * 1024 * 1024];
+            new Random(7).nextBytes(upload);
+            startMockServer(201, "POST", "/upload", "stored");
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/upload"))
+                                             .POST(HttpRequest.BodyPublishers.ofByteArray(upload))
+                                             .build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(201, response.statusCode());
+            assertArrayEquals(upload, mockServer.getLastRequestBody());
+            assertEquals(String.valueOf(upload.length), mockServer.getLastRequestHeaders().getFirst("Content-Length"));
+        }
+
+        @Test
+        @DisplayName("Should keep upstream Content-Length on HEAD responses")
+        void shouldKeepContentLengthOnHeadResponses() throws Exception {
+            mockServer.addEndpoint("/file", "HEAD", 200, new byte[0], Map.of("Content-Length", List.of("1234")));
+            mockServer.start();
+
+            HttpResponse<String> response = sendRequestToProxyServer("/file", "HEAD");
+
+            assertEquals(200, response.statusCode());
+            assertEquals("1234", response.headers().firstValue("Content-Length").orElse(null));
+        }
+    }
+
+    @Nested
     @DisplayName("Bind Address Tests")
     class BindAddressTests {
         @Test
@@ -263,7 +353,7 @@ class ProxyServerTest {
         assertTrue(logHappened);
 
         ArgumentCaptor<LogEntry> logEntryCaptor = ArgumentCaptor.forClass(LogEntry.class);
-        verify(logService, only()).log(logEntryCaptor.capture());
+        verify(logService).log(logEntryCaptor.capture());
 
         LogEntry capturedEntry = logEntryCaptor.getValue();
         assertNotNull(capturedEntry);
@@ -308,7 +398,7 @@ class ProxyServerTest {
             assertTrue(logHappened, "Logging should happen within timeout");
 
             ArgumentCaptor<LogEntry> logEntryCaptor = ArgumentCaptor.forClass(LogEntry.class);
-            verify(logService, only()).log(logEntryCaptor.capture());
+            verify(logService).log(logEntryCaptor.capture());
 
             LogEntry capturedEntry = logEntryCaptor.getValue();
             assertNotNull(capturedEntry);

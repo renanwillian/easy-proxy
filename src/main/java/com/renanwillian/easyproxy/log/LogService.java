@@ -16,6 +16,7 @@ public class LogService {
     private final boolean showHeaders;
     private final boolean showDetails;
     private final boolean showSecrets;
+    private final int maxBodySize;
     private final BodyFormatter bodyFormatter;
 
     public LogService(boolean showHeaders, boolean showDetails) {
@@ -30,7 +31,17 @@ public class LogService {
         this.showHeaders = showHeaders;
         this.showDetails = showDetails;
         this.showSecrets = showSecrets;
+        this.maxBodySize = maxBodySize;
         this.bodyFormatter = new BodyFormatter(maxBodySize);
+    }
+
+    /**
+     * How many bytes of each body the proxy should keep for this service to print. Bodies are streamed, so only
+     * this prefix is held in memory.
+     */
+    public int bodyCaptureLimit() {
+        if (!showDetails) return 0;
+        return maxBodySize == 0 ? Integer.MAX_VALUE : maxBodySize;
     }
 
     public void log(LogEntry logEntry) {
@@ -64,8 +75,8 @@ public class LogService {
                 appendHeaders(sb, "Response Headers: ", logEntry.getResponseHeaders());
             }
             if (showDetails) {
-                appendBody(sb, "Request Body: ", logEntry.getRequestBody(), logEntry.getRequestHeaders());
-                appendBody(sb, "Response Body: ", logEntry.getResponseBody(), logEntry.getResponseHeaders());
+                appendBody(sb, "Request Body: ", logEntry.getRequestBody(), logEntry.getRequestBodySize(), logEntry.getRequestHeaders());
+                appendBody(sb, "Response Body: ", logEntry.getResponseBody(), logEntry.getResponseBodySize(), logEntry.getResponseHeaders());
             }
 
             sb.append(AnsiUtils.colorize(SEPARATOR + "\n", AnsiUtils.WHITE));
@@ -88,10 +99,10 @@ public class LogService {
         sb.append(BREAK);
     }
 
-    private void appendBody(StringBuilder sb, String label, byte[] body, Map<String, List<String>> headers) {
+    private void appendBody(StringBuilder sb, String label, byte[] body, long totalSize, Map<String, List<String>> headers) {
         if (body == null) return;
         appendLabel(sb, label);
-        sb.append(AnsiUtils.colorize(bodyFormatter.format(body, headers), AnsiUtils.WHITE));
+        sb.append(AnsiUtils.colorize(bodyFormatter.format(body, totalSize, headers), AnsiUtils.WHITE));
         sb.append(BREAK);
     }
 }

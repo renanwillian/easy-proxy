@@ -21,6 +21,7 @@ public class MockServer {
     private HttpServer server;
     private final int port;
     private final List<MockEndpoint> endpoints = new ArrayList<>();
+    private final List<StreamingEndpoint> streamingEndpoints = new ArrayList<>();
     private volatile boolean isRunning = false;
     private volatile Headers lastRequestHeaders;
     private volatile byte[] lastRequestBody;
@@ -34,6 +35,10 @@ public class MockServer {
         for (MockEndpoint endpoint : endpoints) {
             server.createContext(endpoint.path(), new GenericHandler(endpoint, this));
         }
+        for (StreamingEndpoint endpoint : streamingEndpoints) {
+            server.createContext(endpoint.path(), endpoint);
+        }
+        server.setExecutor(java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor());
         server.start();
         isRunning = true;
     }
@@ -64,6 +69,14 @@ public class MockServer {
         endpoints.add(new MockEndpoint(path, method, 200, "slow".getBytes(StandardCharsets.UTF_8), Map.of(), delay));
     }
 
+    /**
+     * Adds an endpoint that sends {@code chunks} one at a time with chunked encoding, flushing each one and
+     * waiting {@code interval} between them, like a server-sent events stream.
+     */
+    public void addStreamingEndpoint(String path, List<String> chunks, Duration interval) {
+        streamingEndpoints.add(new StreamingEndpoint(path, chunks, interval));
+    }
+
     public boolean isRunning() {
         return isRunning;
     }
@@ -78,6 +91,23 @@ public class MockServer {
 
     private record MockEndpoint(String path, String method, int statusCode, byte[] responseBody,
                                 Map<String, List<String>> responseHeaders, Duration delay) {}
+
+    private record StreamingEndpoint(String path, List<String> chunks, Duration interval) implements HttpHandler {
+        @Override
+        public void handle(HttpExchange exchange) throws IOException {
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, 0);
+            try (OutputStream os = exchange.getResponseBody()) {
+                for (int i = 0; i < chunks.size(); i++) {
+                    if (i > 0) Thread.sleep(interval);
+                    os.write(chunks.get(i).getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        }
+    }
 
     private record GenericHandler(MockEndpoint endpoint, MockServer mockServer) implements HttpHandler {
 

@@ -14,8 +14,10 @@ public class LogEntry {
     private LocalDateTime timestamp;
     private Map<String, List<String>> requestHeaders;
     private byte[] requestBody;
+    private long requestBodySize;
     private Map<String, List<String>> responseHeaders;
     private byte[] responseBody;
+    private long responseBodySize;
 
     public String getMethod() {
         return method;
@@ -79,6 +81,24 @@ public class LogEntry {
 
     public void setRequestBody(byte[] requestBody) {
         this.requestBody = requestBody;
+    }
+
+    /** Total size of the request body, which may be larger than the captured {@link #getRequestBody()}. */
+    public long getRequestBodySize() {
+        return requestBodySize;
+    }
+
+    public void setRequestBodySize(long requestBodySize) {
+        this.requestBodySize = requestBodySize;
+    }
+
+    /** Total size of the response body, which may be larger than the captured {@link #getResponseBody()}. */
+    public long getResponseBodySize() {
+        return responseBodySize;
+    }
+
+    public void setResponseBodySize(long responseBodySize) {
+        this.responseBodySize = responseBodySize;
     }
 
     public Map<String, List<String>> getResponseHeaders() {

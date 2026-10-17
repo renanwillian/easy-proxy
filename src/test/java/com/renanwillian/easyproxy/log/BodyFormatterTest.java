@@ -26,6 +26,31 @@ class BodyFormatterTest {
     }
 
     @Test
+    void shouldMarkPartiallyCapturedBodiesAsTruncated() {
+        String output = unlimited.format("partial".getBytes(), 1000, headers("Content-Type", "text/plain"));
+
+        assertEquals("partial... (truncated, 1000 bytes total)", output);
+    }
+
+    @Test
+    void shouldDecompressPartiallyCapturedGzipBodies() throws IOException {
+        String text = java.util.stream.IntStream.range(0, 5000).mapToObj(Integer::toString)
+                                                .collect(java.util.stream.Collectors.joining(","));
+        byte[] compressed = LogServiceTest.gzip(text);
+        byte[] prefix = java.util.Arrays.copyOf(compressed, compressed.length / 2);
+
+        String output = unlimited.format(prefix, compressed.length, headers("Content-Encoding", "gzip"));
+
+        assertTrue(output.startsWith("0,1,2,3,4,5,6,7,8,9,10"), output);
+        assertTrue(output.endsWith("(truncated, " + compressed.length + " bytes total)"), output);
+    }
+
+    @Test
+    void shouldReportBodiesThatWereNotCaptured() {
+        assertEquals("(500 bytes, not captured)", formatter.format(new byte[0], 500, Map.of()));
+    }
+
+    @Test
     void shouldPrintEmptyMarkerForEmptyBody() {
         assertEquals("(empty)", formatter.format(new byte[0], Map.of()));
         assertEquals("(empty)", formatter.format(null, Map.of()));
