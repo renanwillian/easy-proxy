@@ -21,10 +21,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 
 public class ProxyHandler implements HttpHandler {
 
@@ -133,13 +133,13 @@ public class ProxyHandler implements HttpHandler {
     }
 
     private Map<String, List<String>> getRequestHeaders(HttpExchange exchange) {
-        Map<String, List<String>> headers = new HashMap<>();
+        Map<String, List<String>> headers = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         exchange.getRequestHeaders().forEach((k, v) -> headers.put(k, List.copyOf(v)));
         return headers;
     }
 
     private Map<String, List<String>> getResponseHeaders(HttpResponse<byte[]> response) {
-        Map<String, List<String>> responseHeaders = new HashMap<>();
+        Map<String, List<String>> responseHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         response.headers().map().forEach((key, value) -> {
             if (key != null && value != null && !RESPONSE_FRAMING_HEADERS.contains(key.toLowerCase())) {
                 responseHeaders.put(key, List.copyOf(value));

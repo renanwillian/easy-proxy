@@ -21,6 +21,10 @@ public class LogService {
     }
 
     public void log(LogEntry logEntry) {
+        TerminalUtils.println(format(logEntry));
+    }
+
+    String format(LogEntry logEntry) {
         StringBuilder sb = new StringBuilder();
         sb.append(AnsiUtils.colorize(logEntry.getMethod(), AnsiUtils.CYAN));
         sb.append(" ").append(logEntry.getPath());
@@ -59,17 +63,25 @@ public class LogService {
             sb.append(AnsiUtils.colorize("-------------------------------------------------------------\n", AnsiUtils.WHITE));
         }
 
-        TerminalUtils.println(sb.toString());
+        return sb.toString();
     }
 
     private String getBodyAsString(byte[] body, Map<String, List<String>> headers) {
         if (body == null) return "(empty)";
-        List<String> encodings = headers != null ? headers.get("Content-Encoding") : null;
-        String contentEncoding = encodings != null && !encodings.isEmpty() ? encodings.get(0) : null;
+        String contentEncoding = firstHeaderValue(headers, "Content-Encoding");
         try {
             return new String(GzipUtils.uncompressIfGzipped(body, contentEncoding));
         } catch (IOException e) {
             return "(error decompressing body) " + new String(body);
         }
+    }
+
+    private static String firstHeaderValue(Map<String, List<String>> headers, String name) {
+        if (headers == null) return null;
+        return headers.entrySet().stream()
+                      .filter(e -> name.equalsIgnoreCase(e.getKey()) && e.getValue() != null && !e.getValue().isEmpty())
+                      .map(e -> e.getValue().get(0))
+                      .findFirst()
+                      .orElse(null);
     }
 }
