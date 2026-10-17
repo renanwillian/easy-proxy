@@ -149,7 +149,8 @@ public class ProxyHandler implements HttpHandler {
     }
 
     private void forwardResponse(HttpExchange exchange, int responseCode, byte[] responseData) throws IOException {
-        if (responseData != null) {
+        // For HttpServer, a length of 0 means "chunked"; -1 means "no body".
+        if (responseData != null && responseData.length > 0) {
             exchange.sendResponseHeaders(responseCode, responseData.length);
             try (OutputStream responseBody = exchange.getResponseBody()) {
                 responseBody.write(responseData);

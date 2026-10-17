@@ -159,6 +159,20 @@ class ProxyServerTest {
         }
     }
 
+    @Test
+    @DisplayName("Should not use chunked encoding for empty responses")
+    void shouldNotUseChunkedEncodingForEmptyResponses() throws Exception {
+        startMockServer(200, "GET", "/empty", "");
+
+        HttpResponse<String> response = sendRequestToProxyServer("/empty", "GET");
+
+        assertEquals(200, response.statusCode());
+        assertEquals("", response.body());
+        assertTrue(response.headers().firstValue("Transfer-Encoding").isEmpty(),
+                "Empty body should not be sent as chunked");
+        assertEquals("0", response.headers().firstValue("Content-Length").orElse(null));
+    }
+
     @Nested
     @DisplayName("Error Handling Tests")
     class ErrorHandlingTests {
