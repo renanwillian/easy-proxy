@@ -15,10 +15,23 @@
         <junit.version>5.13.4</junit.version>
         <mockito.version>5.18.0</mockito.version>
         <maven-compiler-plugin-version>3.15.0</maven-compiler-plugin-version>
+        <maven-jar-plugin-version>3.4.2</maven-jar-plugin-version>
         <maven-surefire-plugin-version>3.5.4</maven-surefire-plugin-version>
         <maven-resources-plugin-version>3.3.1</maven-resources-plugin-version>
         <native.maven.plugin.version>1.1.8</native.maven.plugin.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>${junit.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <dependency>
@@ -29,15 +42,7 @@
 
         <dependency>
             <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <version>${junit.version}</version>
-            <scope>test</scope>
-        </dependency>
-
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-params</artifactId>
-            <version>${junit.version}</version>
+            <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
 
@@ -85,7 +90,7 @@
                             <path>
                                 <groupId>info.picocli</groupId>
                                 <artifactId>picocli-codegen</artifactId>
-                                <version>4.7.6</version>
+                                <version>${picocli.version}</version>
                             </path>
                         </annotationProcessorPaths>
                         <compilerArgs>
@@ -96,13 +101,33 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>3.2.0</version>
+                    <version>${maven-jar-plugin-version}</version>
                     <configuration>
                         <archive>
                             <manifest>
                                 <mainClass>com.renanwillian.easyproxy.EasyProxy</mainClass>
                             </manifest>
                         </archive>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.graalvm.buildtools</groupId>
+                    <artifactId>native-maven-plugin</artifactId>
+                    <version>${native.maven.plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>build-native</id>
+                            <goals>
+                                <goal>compile-no-fork</goal>
+                            </goals>
+                            <phase>package</phase>
+                        </execution>
+                    </executions>
+                    <configuration>
+                        <buildArgs>
+                            <buildArg>--enable-url-protocols=http,https</buildArg>
+                            <buildArg>-H:IncludeResources=.*easy-proxy-version.properties</buildArg>
+                        </buildArgs>
                     </configuration>
                 </plugin>
             </plugins>
@@ -117,51 +142,24 @@
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>${native.maven.plugin.version}</version>
                         <extensions>true</extensions>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals>
-                                    <goal>compile-no-fork</goal>
-                                </goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
-                        <configuration>
-                            <buildArgs>
-                                <buildArg>--enable-url-protocols=http,https</buildArg>
-                                <buildArg>-H:IncludeResources=.*easy-proxy-version.properties</buildArg>
-                            </buildArgs>
-                        </configuration>
                     </plugin>
                 </plugins>
             </build>
         </profile>
         <profile>
+            <!-- Fully static binary, used for releases -->
             <id>native-musl</id>
             <build>
                 <plugins>
                     <plugin>
                         <groupId>org.graalvm.buildtools</groupId>
                         <artifactId>native-maven-plugin</artifactId>
-                        <version>${native.maven.plugin.version}</version>
                         <extensions>true</extensions>
-                        <executions>
-                            <execution>
-                                <id>build-native</id>
-                                <goals>
-                                    <goal>compile-no-fork</goal>
-                                </goals>
-                                <phase>package</phase>
-                            </execution>
-                        </executions>
                         <configuration>
-                            <buildArgs>
-                                <buildArg>--enable-url-protocols=http,https</buildArg>
+                            <buildArgs combine.children="append">
                                 <buildArg>--static</buildArg>
                                 <buildArg>--libc=musl</buildArg>
-                                <buildArg>-H:IncludeResources=.*easy-proxy-version.properties</buildArg>
                             </buildArgs>
                         </configuration>
                     </plugin>
