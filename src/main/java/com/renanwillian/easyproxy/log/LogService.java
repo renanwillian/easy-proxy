@@ -15,18 +15,21 @@ public class LogService {
 
     private final boolean showHeaders;
     private final boolean showDetails;
+    private final boolean showSecrets;
     private final BodyFormatter bodyFormatter;
 
     public LogService(boolean showHeaders, boolean showDetails) {
-        this(showHeaders, showDetails, DEFAULT_MAX_BODY_SIZE);
+        this(showHeaders, showDetails, DEFAULT_MAX_BODY_SIZE, false);
     }
 
     /**
      * @param maxBodySize maximum number of body bytes to print; 0 means no limit.
+     * @param showSecrets print credentials (Authorization, cookies, API keys) instead of masking them.
      */
-    public LogService(boolean showHeaders, boolean showDetails, int maxBodySize) {
+    public LogService(boolean showHeaders, boolean showDetails, int maxBodySize, boolean showSecrets) {
         this.showHeaders = showHeaders;
         this.showDetails = showDetails;
+        this.showSecrets = showSecrets;
         this.bodyFormatter = new BodyFormatter(maxBodySize);
     }
 
@@ -75,11 +78,13 @@ public class LogService {
         sb.append(AnsiUtils.colorize(label, AnsiUtils.WHITE_BOLD));
     }
 
-    private static void appendHeaders(StringBuilder sb, String label, Map<String, List<String>> headers) {
+    private void appendHeaders(StringBuilder sb, String label, Map<String, List<String>> headers) {
         if (headers == null || headers.isEmpty()) return;
         appendLabel(sb, label);
-        headers.forEach((name, values) -> values.forEach(value ->
-                sb.append(AnsiUtils.colorize("\n  " + name + ": " + value, AnsiUtils.WHITE))));
+        headers.forEach((name, values) -> values.forEach(value -> {
+            String shown = showSecrets ? value : HeaderMasker.mask(name, value);
+            sb.append(AnsiUtils.colorize("\n  " + name + ": " + shown, AnsiUtils.WHITE));
+        }));
         sb.append(BREAK);
     }
 

@@ -68,8 +68,8 @@ class LogServiceTest {
         String output = new LogService(true, false).format(entry);
 
         assertTrue(output.contains("Accept: application/json"), output);
-        assertTrue(output.contains("Set-Cookie: a=1"), output);
-        assertTrue(output.contains("Set-Cookie: b=2"), output);
+        assertTrue(output.contains("Set-Cookie: a=****"), output);
+        assertTrue(output.contains("Set-Cookie: b=****"), output);
         assertFalse(output.contains("secret-body"), "Body should only be shown with --details");
     }
 
@@ -83,5 +83,26 @@ class LogServiceTest {
 
         assertFalse(output.contains("Accept: application/json"), output);
         assertTrue(output.contains("the-body"), output);
+    }
+
+    @Test
+    void shouldMaskSecretsByDefault() {
+        LogEntry entry = baseEntry();
+        entry.setRequestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
+
+        String output = new LogService(true, false).format(entry);
+
+        assertTrue(output.contains("Authorization: Bearer ****"), output);
+        assertFalse(output.contains("top-secret"), output);
+    }
+
+    @Test
+    void shouldShowSecretsWhenEnabled() {
+        LogEntry entry = baseEntry();
+        entry.setRequestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
+
+        String output = new LogService(true, false, LogService.DEFAULT_MAX_BODY_SIZE, true).format(entry);
+
+        assertTrue(output.contains("Authorization: Bearer top-secret"), output);
     }
 }

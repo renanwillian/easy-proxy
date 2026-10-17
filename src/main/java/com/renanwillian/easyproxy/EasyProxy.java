@@ -47,6 +47,10 @@ public class EasyProxy implements Callable<Integer> {
             description = "Maximum number of body bytes shown with --details; 0 means no limit (default: 4096).")
     private int maxBodySize = LogService.DEFAULT_MAX_BODY_SIZE;
 
+    @Option(names = {"--show-secrets"},
+            description = "Show credentials (Authorization, cookies, API keys) in logged headers instead of masking them (default: false).")
+    private boolean showSecrets = false;
+
     @Parameters(paramLabel = "TARGET_URL", description = "The target URL for the proxy.")
     private String targetUrl;
 
@@ -58,7 +62,7 @@ public class EasyProxy implements Callable<Integer> {
     @Override
     public Integer call() {
         validateOptions();
-        LogService logService = new LogService(headers, details, maxBodySize);
+        LogService logService = new LogService(headers, details, maxBodySize, showSecrets);
 
         ProxyConfig config = ProxyConfig.of(port, targetUrl)
                                         .withHost(host)

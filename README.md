@@ -21,7 +21,7 @@ easy-proxy --version
 ```text
 $ easy-proxy --help
 Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>]
-                  [--max-body-size=<bytes>] [--port=<port>]
+                  [--max-body-size=<bytes>] [--port=<port>] [--show-secrets]
                   [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
 
@@ -34,6 +34,8 @@ Starts a reverse proxy server.
                     Maximum number of body bytes shown with --details; 0
                       means no limit (default: 4096).
   --port=<port>     The port on which the server will run (default: 8000).
+  --show-secrets    Show credentials (Authorization, cookies, API keys) in
+                      logged headers instead of masking them (default: false).
   --timeout=<seconds>
                     How long to wait for the target to start responding
                       (default: 10).
