@@ -20,7 +20,7 @@ easy-proxy --version
 ## 📖 Usage
 ```text
 $ easy-proxy --help
-Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>]
+Usage: easy-proxy [-hkV] [--details] [--headers] [--host=<host>]
                   [--max-body-size=<bytes>] [--port=<port>] [--show-secrets]
                   [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
@@ -39,6 +39,8 @@ Starts a reverse proxy server.
   --timeout=<seconds>
                     How long to wait for the target to start responding
                       (default: 10).
+  -k, --insecure    Accept any TLS certificate from the target, e.g. self-signed
+                      ones (default: false).
   -h, --help        Show this help message and exit.
   -V, --version     Print version information and exit.
 ```

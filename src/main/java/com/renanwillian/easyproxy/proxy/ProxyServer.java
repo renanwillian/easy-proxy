@@ -32,9 +32,9 @@ public class ProxyServer implements AutoCloseable {
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
-        httpClient = HttpClient.newBuilder()
-                               .connectTimeout(CONNECT_TIMEOUT)
-                               .build();
+        HttpClient.Builder clientBuilder = HttpClient.newBuilder().connectTimeout(CONNECT_TIMEOUT);
+        if (config.insecure()) clientBuilder.sslContext(InsecureTls.sslContext());
+        httpClient = clientBuilder.build();
         server.createContext("/", new ProxyHandler(targetUrl, httpClient, config.timeout(), logService));
 
         executor = Executors.newVirtualThreadPerTaskExecutor();

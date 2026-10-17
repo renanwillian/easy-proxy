@@ -51,6 +51,10 @@ public class EasyProxy implements Callable<Integer> {
             description = "Show credentials (Authorization, cookies, API keys) in logged headers instead of masking them (default: false).")
     private boolean showSecrets = false;
 
+    @Option(names = {"-k", "--insecure"},
+            description = "Accept any TLS certificate from the target, e.g. self-signed ones (default: false).")
+    private boolean insecure = false;
+
     @Parameters(paramLabel = "TARGET_URL", description = "The target URL for the proxy.")
     private String targetUrl;
 
@@ -66,12 +70,16 @@ public class EasyProxy implements Callable<Integer> {
 
         ProxyConfig config = ProxyConfig.of(port, targetUrl)
                                         .withHost(host)
-                                        .withTimeout(Duration.ofSeconds(timeoutSeconds));
+                                        .withTimeout(Duration.ofSeconds(timeoutSeconds))
+                                        .withInsecure(insecure);
         try (ProxyServer server = new ProxyServer(config, logService)) {
             server.start();
 
             TerminalUtils.println("Proxy server running on http://" + displayHost(host) + ":" + server.getPort()
                     + " and redirecting to " + targetUrl);
+            if (insecure) {
+                TerminalUtils.printlnError("Warning: TLS certificate verification is disabled (--insecure).");
+            }
             TerminalUtils.println();
 
             Thread.currentThread().join();
