@@ -348,8 +348,8 @@ class ProxyServerTest {
 
                 ArgumentCaptor<LogEntry> captor = ArgumentCaptor.forClass(LogEntry.class);
                 verify(limitedLog, timeout(2000)).log(captor.capture());
-                assertEquals(1024, captor.getValue().getResponseBody().length);
-                assertEquals(largeBody.length, captor.getValue().getResponseBodySize());
+                assertEquals(1024, captor.getValue().responseBody().length);
+                assertEquals(largeBody.length, captor.getValue().responseBodySize());
             }
         }
 
@@ -460,10 +460,10 @@ class ProxyServerTest {
 
         LogEntry capturedEntry = logEntryCaptor.getValue();
         assertNotNull(capturedEntry);
-        assertEquals(method, capturedEntry.getMethod());
-        assertEquals(path, capturedEntry.getPath());
-        assertEquals(statusCode, capturedEntry.getStatusCode());
-        assertEquals(responseBody, new String(capturedEntry.getResponseBody()));
+        assertEquals(method, capturedEntry.method());
+        assertEquals(path, capturedEntry.path());
+        assertEquals(statusCode, capturedEntry.statusCode());
+        assertEquals(responseBody, new String(capturedEntry.responseBody()));
     }
 
     @Nested
@@ -505,11 +505,11 @@ class ProxyServerTest {
 
             LogEntry capturedEntry = logEntryCaptor.getValue();
             assertNotNull(capturedEntry);
-            assertEquals(method, capturedEntry.getMethod());
-            assertEquals(path, capturedEntry.getPath());
-            assertEquals(statusCode, capturedEntry.getStatusCode());
-            assertEquals(requestBody, new String(capturedEntry.getRequestBody()));
-            assertEquals(responseBody, new String(capturedEntry.getResponseBody()));
+            assertEquals(method, capturedEntry.method());
+            assertEquals(path, capturedEntry.path());
+            assertEquals(statusCode, capturedEntry.statusCode());
+            assertEquals(requestBody, new String(capturedEntry.requestBody()));
+            assertEquals(responseBody, new String(capturedEntry.responseBody()));
         }
 
         @Test
@@ -530,11 +530,11 @@ class ProxyServerTest {
             verify(logService).log(logEntryCaptor.capture());
 
             LogEntry capturedEntry = logEntryCaptor.getValue();
-            assertEquals(502, capturedEntry.getStatusCode());
-            assertNotNull(capturedEntry.getError());
-            assertTrue(capturedEntry.getError().contains("ConnectException"), capturedEntry.getError());
-            assertEquals("GET", capturedEntry.getMethod());
-            assertEquals("/unavailable", capturedEntry.getPath());
+            assertEquals(502, capturedEntry.statusCode());
+            assertNotNull(capturedEntry.error());
+            assertTrue(capturedEntry.error().contains("ConnectException"), capturedEntry.error());
+            assertEquals("GET", capturedEntry.method());
+            assertEquals("/unavailable", capturedEntry.path());
         }
     }
 

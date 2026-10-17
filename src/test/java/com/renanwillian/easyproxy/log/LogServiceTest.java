@@ -7,6 +7,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -17,14 +18,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LogServiceTest {
 
-    static LogEntry baseEntry() {
-        LogEntry entry = new LogEntry();
-        entry.setMethod("GET");
-        entry.setPath("/api");
-        entry.setStatusCode(200);
-        entry.setResponseMessage("OK");
-        entry.setDuration(12L);
-        entry.setTimestamp(LocalDateTime.of(2026, 1, 1, 10, 0));
+    static LogEntry.Builder baseEntry() {
+        LogEntry.Builder entry = LogEntry.builder();
+        entry.method("GET");
+        entry.path("/api");
+        entry.statusCode(200);
+        entry.responseMessage("OK");
+        entry.duration(Duration.ofMillis(12));
+        entry.timestamp(LocalDateTime.of(2026, 1, 1, 10, 0));
         return entry;
     }
 
@@ -39,18 +40,18 @@ class LogServiceTest {
     @ParameterizedTest
     @ValueSource(strings = {"Content-Encoding", "content-encoding", "Content-encoding"})
     void shouldDecompressGzipBodyRegardlessOfHeaderCase(String headerName) throws IOException {
-        LogEntry entry = baseEntry();
-        entry.setResponseHeaders(Map.of(headerName, List.of("gzip")));
-        entry.setResponseBody(gzip("{\"hello\":\"world\"}"));
+        LogEntry.Builder entry = baseEntry();
+        entry.responseHeaders(Map.of(headerName, List.of("gzip")));
+        entry.responseBody(gzip("{\"hello\":\"world\"}"));
 
-        String output = new LogService(false, true).format(entry);
+        String output = new LogService(false, true).format(entry.build());
 
         assertTrue(output.contains("{\"hello\":\"world\"}"), output);
     }
 
     @Test
     void shouldIncludeMethodPathStatusAndDuration() {
-        String output = new LogService(false, false).format(baseEntry());
+        String output = new LogService(false, false).format(baseEntry().build());
 
         assertTrue(output.contains("GET"), output);
         assertTrue(output.contains("/api"), output);
@@ -60,12 +61,12 @@ class LogServiceTest {
 
     @Test
     void shouldShowRequestAndResponseHeadersWithoutDetails() {
-        LogEntry entry = baseEntry();
-        entry.setRequestHeaders(Map.of("Accept", List.of("application/json")));
-        entry.setResponseHeaders(Map.of("Set-Cookie", List.of("a=1", "b=2")));
-        entry.setResponseBody("secret-body".getBytes());
+        LogEntry.Builder entry = baseEntry();
+        entry.requestHeaders(Map.of("Accept", List.of("application/json")));
+        entry.responseHeaders(Map.of("Set-Cookie", List.of("a=1", "b=2")));
+        entry.responseBody("secret-body".getBytes());
 
-        String output = new LogService(true, false).format(entry);
+        String output = new LogService(true, false).format(entry.build());
 
         assertTrue(output.contains("Accept: application/json"), output);
         assertTrue(output.contains("Set-Cookie: a=****"), output);
@@ -75,11 +76,11 @@ class LogServiceTest {
 
     @Test
     void shouldNotShowHeadersWithDetailsOnly() {
-        LogEntry entry = baseEntry();
-        entry.setRequestHeaders(Map.of("Accept", List.of("application/json")));
-        entry.setResponseBody("the-body".getBytes());
+        LogEntry.Builder entry = baseEntry();
+        entry.requestHeaders(Map.of("Accept", List.of("application/json")));
+        entry.responseBody("the-body".getBytes());
 
-        String output = new LogService(false, true).format(entry);
+        String output = new LogService(false, true).format(entry.build());
 
         assertFalse(output.contains("Accept: application/json"), output);
         assertTrue(output.contains("the-body"), output);
@@ -87,22 +88,22 @@ class LogServiceTest {
 
     @Test
     void shouldShowErrorCauseEvenWithoutDetails() {
-        LogEntry entry = baseEntry();
-        entry.setStatusCode(502);
-        entry.setResponseMessage("Bad Gateway");
-        entry.setError("ConnectException: Connection refused");
+        LogEntry.Builder entry = baseEntry();
+        entry.statusCode(502);
+        entry.responseMessage("Bad Gateway");
+        entry.error("ConnectException: Connection refused");
 
-        String output = new LogService(false, false).format(entry);
+        String output = new LogService(false, false).format(entry.build());
 
         assertTrue(output.contains("Cause: ConnectException: Connection refused"), output);
     }
 
     @Test
     void shouldMaskSecretsByDefault() {
-        LogEntry entry = baseEntry();
-        entry.setRequestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
+        LogEntry.Builder entry = baseEntry();
+        entry.requestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
 
-        String output = new LogService(true, false).format(entry);
+        String output = new LogService(true, false).format(entry.build());
 
         assertTrue(output.contains("Authorization: Bearer ****"), output);
         assertFalse(output.contains("top-secret"), output);
@@ -110,10 +111,10 @@ class LogServiceTest {
 
     @Test
     void shouldShowSecretsWhenEnabled() {
-        LogEntry entry = baseEntry();
-        entry.setRequestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
+        LogEntry.Builder entry = baseEntry();
+        entry.requestHeaders(Map.of("Authorization", List.of("Bearer top-secret")));
 
-        String output = new LogService(true, false, LogService.DEFAULT_MAX_BODY_SIZE, true).format(entry);
+        String output = new LogService(true, false, LogService.DEFAULT_MAX_BODY_SIZE, true).format(entry.build());
 
         assertTrue(output.contains("Authorization: Bearer top-secret"), output);
     }

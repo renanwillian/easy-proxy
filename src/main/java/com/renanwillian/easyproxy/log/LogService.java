@@ -50,20 +50,16 @@ public class LogService {
 
     String format(LogEntry logEntry) {
         StringBuilder sb = new StringBuilder();
-        sb.append(AnsiUtils.colorize(logEntry.getMethod(), AnsiUtils.CYAN));
-        sb.append(" ").append(logEntry.getPath());
+        sb.append(AnsiUtils.colorize(logEntry.method(), AnsiUtils.CYAN));
+        sb.append(" ").append(logEntry.path());
 
-        if (logEntry.getStatusCode() == 0) {
-            sb.append(AnsiUtils.colorize(" -> " + logEntry.getResponseMessage(), AnsiUtils.RED_BOLD));
-        } else {
-            String color = logEntry.getStatusCode() >= 400 ? AnsiUtils.RED_BOLD : AnsiUtils.GREEN_BOLD;
-            sb.append(AnsiUtils.colorize(" -> " + logEntry.getStatusCode() + " " + logEntry.getResponseMessage(), color));
-        }
+        String color = logEntry.statusCode() >= 400 ? AnsiUtils.RED_BOLD : AnsiUtils.GREEN_BOLD;
+        sb.append(AnsiUtils.colorize(" -> " + logEntry.statusCode() + " " + logEntry.responseMessage(), color));
 
-        sb.append(AnsiUtils.colorize(" (" + logEntry.getDuration() + "ms)", AnsiUtils.PURPLE_BOLD));
+        sb.append(AnsiUtils.colorize(" (" + logEntry.duration().toMillis() + "ms)", AnsiUtils.PURPLE_BOLD));
 
-        if (logEntry.getError() != null) {
-            sb.append(AnsiUtils.colorize("\n  Cause: " + logEntry.getError(), AnsiUtils.RED_BOLD));
+        if (logEntry.error() != null) {
+            sb.append(AnsiUtils.colorize("\n  Cause: " + logEntry.error(), AnsiUtils.RED_BOLD));
         }
 
         if (showDetails || showHeaders) {
@@ -71,16 +67,16 @@ public class LogService {
 
             if (showDetails) {
                 appendLabel(sb, "Timestamp: ");
-                sb.append(AnsiUtils.colorize(String.valueOf(logEntry.getTimestamp()), AnsiUtils.WHITE));
+                sb.append(AnsiUtils.colorize(String.valueOf(logEntry.timestamp()), AnsiUtils.WHITE));
                 sb.append(BREAK);
             }
             if (showHeaders) {
-                appendHeaders(sb, "Request Headers: ", logEntry.getRequestHeaders());
-                appendHeaders(sb, "Response Headers: ", logEntry.getResponseHeaders());
+                appendHeaders(sb, "Request Headers: ", logEntry.requestHeaders());
+                appendHeaders(sb, "Response Headers: ", logEntry.responseHeaders());
             }
             if (showDetails) {
-                appendBody(sb, "Request Body: ", logEntry.getRequestBody(), logEntry.getRequestBodySize(), logEntry.getRequestHeaders());
-                appendBody(sb, "Response Body: ", logEntry.getResponseBody(), logEntry.getResponseBodySize(), logEntry.getResponseHeaders());
+                appendBody(sb, "Request Body: ", logEntry.requestBody(), logEntry.requestBodySize(), logEntry.requestHeaders());
+                appendBody(sb, "Response Body: ", logEntry.responseBody(), logEntry.responseBodySize(), logEntry.responseHeaders());
             }
 
             sb.append(AnsiUtils.colorize(SEPARATOR + "\n", AnsiUtils.WHITE));

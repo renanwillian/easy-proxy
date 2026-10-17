@@ -19,7 +19,6 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -59,26 +58,25 @@ public class ProxyHandler implements HttpHandler {
 
     @Override
     public void handle(HttpExchange exchange) {
-        Instant start = Instant.now();
-        LogEntry log = new LogEntry();
-        log.setTimestamp(LocalDateTime.now());
+        long startNanos = System.nanoTime();
+        LogEntry.Builder log = LogEntry.builder().timestamp(LocalDateTime.now());
         BodyCapture requestCapture = new BodyCapture(bodyCaptureLimit);
         BodyCapture responseCapture = new BodyCapture(bodyCaptureLimit);
         try {
-            log.setMethod(exchange.getRequestMethod());
-            log.setPath(exchange.getRequestURI().toString());
-            log.setRequestHeaders(copyHeaders(exchange.getRequestHeaders()));
+            log.method(exchange.getRequestMethod())
+               .path(exchange.getRequestURI().toString())
+               .requestHeaders(copyHeaders(exchange.getRequestHeaders()));
 
             HttpRequest request = buildRequest(exchange, requestCapture);
             HttpResponse<InputStream> response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
 
             try (InputStream upstreamBody = response.body()) {
-                log.setStatusCode(response.statusCode());
-                log.setResponseMessage(HttpUtils.getStatusText(response.statusCode()));
+                log.statusCode(response.statusCode())
+                   .responseMessage(HttpUtils.getStatusText(response.statusCode()));
 
                 Map<String, List<String>> responseHeaders = getResponseHeaders(response);
                 rewriteLocation(exchange, responseHeaders);
-                log.setResponseHeaders(responseHeaders);
+                log.responseHeaders(responseHeaders);
                 forwardResponseHeaders(exchange, responseHeaders);
 
                 forwardResponse(exchange, response, upstreamBody, responseCapture);
@@ -88,14 +86,12 @@ public class ProxyHandler implements HttpHandler {
         } finally {
             exchange.close();
         }
-        log.setRequestBody(requestCapture.bytes());
-        log.setRequestBodySize(requestCapture.totalSize());
-        log.setResponseBody(responseCapture.bytes());
-        log.setResponseBodySize(responseCapture.totalSize());
-
-        long duration = Instant.now().toEpochMilli() - start.toEpochMilli();
-        log.setDuration(duration);
-        logService.log(log);
+        log.requestBody(requestCapture.bytes())
+           .requestBodySize(requestCapture.totalSize())
+           .responseBody(responseCapture.bytes())
+           .responseBodySize(responseCapture.totalSize())
+           .duration(Duration.ofNanos(System.nanoTime() - startNanos));
+        logService.log(log.build());
     }
 
     private HttpRequest buildRequest(HttpExchange exchange, BodyCapture requestCapture) {
@@ -260,14 +256,14 @@ public class ProxyHandler implements HttpHandler {
         }
     }
 
-    private static void handleException(HttpExchange exchange, Exception e, LogEntry log) {
+    private static void handleException(HttpExchange exchange, Exception e, LogEntry.Builder log) {
         if (e instanceof InterruptedException) Thread.currentThread().interrupt();
         String cause = describe(e);
-        log.setError(cause);
+        log.error(cause);
 
         if (exchange.getResponseCode() != -1) {
             // The status line was already sent; the client sees a truncated response.
-            log.setResponseMessage(log.getResponseMessage() + " (response interrupted)");
+            log.responseMessage(HttpUtils.getStatusText(exchange.getResponseCode()) + " (response interrupted)");
             return;
         }
 
@@ -288,8 +284,7 @@ public class ProxyHandler implements HttpHandler {
             message = "Internal Server Error: " + cause;
         }
 
-        log.setStatusCode(statusCode);
-        log.setResponseMessage(message);
+        log.statusCode(statusCode).responseMessage(message);
 
         try {
             byte[] responseBytes = message.getBytes(StandardCharsets.UTF_8);

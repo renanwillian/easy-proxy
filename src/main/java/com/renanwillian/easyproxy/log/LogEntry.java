@@ -1,129 +1,72 @@
 package com.renanwillian.easyproxy.log;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
-public class LogEntry {
+/**
+ * One proxied request, as shown in the log.
+ *
+ * @param requestBody      the captured beginning of the request body, or null if there was none.
+ * @param requestBodySize  the full size of the request body, which may be larger than {@code requestBody}.
+ * @param responseBody     the captured beginning of the response body, or null if there was none.
+ * @param responseBodySize the full size of the response body, which may be larger than {@code responseBody}.
+ * @param error            why the request failed, if it did.
+ */
+public record LogEntry(String method,
+                       String path,
+                       int statusCode,
+                       String responseMessage,
+                       Duration duration,
+                       LocalDateTime timestamp,
+                       Map<String, List<String>> requestHeaders,
+                       byte[] requestBody,
+                       long requestBodySize,
+                       Map<String, List<String>> responseHeaders,
+                       byte[] responseBody,
+                       long responseBodySize,
+                       String error) {
 
-    private String method;
-    private String path;
-    private int statusCode;
-    private String responseMessage;
-    private Long duration;
-    private LocalDateTime timestamp;
-    private Map<String, List<String>> requestHeaders;
-    private byte[] requestBody;
-    private long requestBodySize;
-    private Map<String, List<String>> responseHeaders;
-    private byte[] responseBody;
-    private long responseBodySize;
-    private String error;
-
-    public String getMethod() {
-        return method;
+    public static Builder builder() {
+        return new Builder();
     }
 
-    public void setMethod(String method) {
-        this.method = method;
-    }
+    /** Collects the entry's fields while the request is being proxied. */
+    public static final class Builder {
+        private String method;
+        private String path;
+        private int statusCode;
+        private String responseMessage;
+        private Duration duration = Duration.ZERO;
+        private LocalDateTime timestamp;
+        private Map<String, List<String>> requestHeaders;
+        private byte[] requestBody;
+        private long requestBodySize;
+        private Map<String, List<String>> responseHeaders;
+        private byte[] responseBody;
+        private long responseBodySize;
+        private String error;
 
-    public String getPath() {
-        return path;
-    }
+        private Builder() {}
 
-    public void setPath(String path) {
-        this.path = path;
-    }
+        public Builder method(String method) { this.method = method; return this; }
+        public Builder path(String path) { this.path = path; return this; }
+        public Builder statusCode(int statusCode) { this.statusCode = statusCode; return this; }
+        public Builder responseMessage(String responseMessage) { this.responseMessage = responseMessage; return this; }
+        public Builder duration(Duration duration) { this.duration = duration; return this; }
+        public Builder timestamp(LocalDateTime timestamp) { this.timestamp = timestamp; return this; }
+        public Builder requestHeaders(Map<String, List<String>> headers) { this.requestHeaders = headers; return this; }
+        public Builder requestBody(byte[] requestBody) { this.requestBody = requestBody; return this; }
+        public Builder requestBodySize(long size) { this.requestBodySize = size; return this; }
+        public Builder responseHeaders(Map<String, List<String>> headers) { this.responseHeaders = headers; return this; }
+        public Builder responseBody(byte[] responseBody) { this.responseBody = responseBody; return this; }
+        public Builder responseBodySize(long size) { this.responseBodySize = size; return this; }
+        public Builder error(String error) { this.error = error; return this; }
 
-    public int getStatusCode() {
-        return statusCode;
-    }
-
-    public void setStatusCode(int statusCode) {
-        this.statusCode = statusCode;
-    }
-
-    public String getResponseMessage() {
-        return responseMessage;
-    }
-
-    public void setResponseMessage(String responseMessage) {
-        this.responseMessage = responseMessage;
-    }
-
-    public Long getDuration() {
-        return duration;
-    }
-
-    public void setDuration(Long duration) {
-        this.duration = duration;
-    }
-
-    public LocalDateTime getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(LocalDateTime timestamp) {
-        this.timestamp = timestamp;
-    }
-
-    public Map<String, List<String>> getRequestHeaders() {
-        return requestHeaders;
-    }
-
-    public void setRequestHeaders(Map<String, List<String>> requestHeaders) {
-        this.requestHeaders = requestHeaders;
-    }
-
-    public byte[] getRequestBody() {
-        return requestBody;
-    }
-
-    public void setRequestBody(byte[] requestBody) {
-        this.requestBody = requestBody;
-    }
-
-    /** Total size of the request body, which may be larger than the captured {@link #getRequestBody()}. */
-    public long getRequestBodySize() {
-        return requestBodySize;
-    }
-
-    public void setRequestBodySize(long requestBodySize) {
-        this.requestBodySize = requestBodySize;
-    }
-
-    /** Total size of the response body, which may be larger than the captured {@link #getResponseBody()}. */
-    public long getResponseBodySize() {
-        return responseBodySize;
-    }
-
-    public void setResponseBodySize(long responseBodySize) {
-        this.responseBodySize = responseBodySize;
-    }
-
-    /** Why the request failed, if it did. */
-    public String getError() {
-        return error;
-    }
-
-    public void setError(String error) {
-        this.error = error;
-    }
-
-    public Map<String, List<String>> getResponseHeaders() {
-        return responseHeaders;
-    }
-
-    public void setResponseHeaders(Map<String, List<String>> responseHeaders) {
-        this.responseHeaders = responseHeaders;
-    }
-
-    public byte[] getResponseBody() {
-        return responseBody;
-    }
-
-    public void setResponseBody(byte[] responseBody) {
-        this.responseBody = responseBody;
+        public LogEntry build() {
+            return new LogEntry(method, path, statusCode, responseMessage, duration, timestamp, requestHeaders,
+                    requestBody, requestBodySize, responseHeaders, responseBody, responseBodySize, error);
+        }
     }
 }
