@@ -22,7 +22,7 @@ public class ProxyServer implements AutoCloseable {
     private HttpServer server;
     private ExecutorService executor;
     private HttpClient httpClient;
-    private boolean isRunning = false;
+    private volatile boolean isRunning = false;
 
     public ProxyServer(ProxyConfig config, LogService logService) {
         this.config = config;

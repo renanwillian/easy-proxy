@@ -8,12 +8,20 @@ import java.util.Properties;
 
 public class VersionProvider implements IVersionProvider {
 
+    static final String RESOURCE = "/easy-proxy-version.properties";
+    static final String UNKNOWN = "unknown";
+
     @Override
     public String[] getVersion() throws IOException {
-        try (InputStream in = VersionProvider.class.getResourceAsStream("/easy-proxy-version.properties")) {
+        return new String[]{readVersion(RESOURCE)};
+    }
+
+    static String readVersion(String resource) throws IOException {
+        try (InputStream in = VersionProvider.class.getResourceAsStream(resource)) {
+            if (in == null) return UNKNOWN;
             Properties properties = new Properties();
             properties.load(in);
-            return new String[] { properties.getProperty("version") };
+            return properties.getProperty("version", UNKNOWN);
         }
     }
 }
