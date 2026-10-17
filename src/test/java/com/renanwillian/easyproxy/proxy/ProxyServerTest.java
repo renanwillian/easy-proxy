@@ -20,10 +20,12 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -196,6 +198,82 @@ class ProxyServerTest {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
             assertEquals(504, response.statusCode());
+        }
+    }
+
+    @Nested
+    @DisplayName("Forwarded and Hop-by-hop Header Tests")
+    class ForwardedHeaderTests {
+        @Test
+        @DisplayName("Should add X-Forwarded-* headers")
+        void shouldAddForwardedHeaders() throws Exception {
+            startMockServer(200, "GET", "/fwd", "ok");
+
+            sendRequestToProxyServer("/fwd", "GET");
+
+            var received = mockServer.getLastRequestHeaders();
+            assertEquals("127.0.0.1", received.getFirst("X-Forwarded-For"));
+            assertEquals("localhost:" + PROXY_SERVER_PORT, received.getFirst("X-Forwarded-Host"));
+            assertEquals("http", received.getFirst("X-Forwarded-Proto"));
+        }
+
+        @Test
+        @DisplayName("Should extend an existing X-Forwarded-For chain")
+        void shouldExtendExistingForwardedFor() throws Exception {
+            startMockServer(200, "GET", "/fwd", "ok");
+
+            HttpRequest request = HttpRequest.newBuilder(URI.create(PROXY_URL + "/fwd"))
+                                             .header("X-Forwarded-For", "203.0.113.7")
+                                             .header("X-Forwarded-Proto", "https")
+                                             .build();
+            httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            var received = mockServer.getLastRequestHeaders();
+            assertEquals(List.of("203.0.113.7, 127.0.0.1"), received.get("X-Forwarded-For"));
+            assertEquals(List.of("https"), received.get("X-Forwarded-Proto"));
+        }
+
+        @Test
+        @DisplayName("Should not forward hop-by-hop request headers")
+        void shouldNotForwardHopByHopRequestHeaders() throws Exception {
+            startMockServer(200, "GET", "/hop", "ok");
+
+            // HttpClient refuses to send Connection, so write the request by hand.
+            String rawRequest = "GET /hop HTTP/1.1\r\n"
+                    + "Host: localhost:" + PROXY_SERVER_PORT + "\r\n"
+                    + "Connection: close, X-Internal\r\n"
+                    + "X-Internal: secret\r\n"
+                    + "Keep-Alive: timeout=5\r\n"
+                    + "Proxy-Authorization: Basic abc\r\n"
+                    + "X-Kept: yes\r\n"
+                    + "\r\n";
+            try (Socket socket = new Socket("localhost", PROXY_SERVER_PORT)) {
+                socket.getOutputStream().write(rawRequest.getBytes(StandardCharsets.US_ASCII));
+                socket.getInputStream().readAllBytes();
+            }
+
+            var received = mockServer.getLastRequestHeaders();
+            assertEquals("yes", received.getFirst("X-Kept"));
+            assertFalse(received.containsKey("X-Internal"));
+            assertFalse(received.containsKey("Keep-Alive"));
+            assertFalse(received.containsKey("Proxy-Authorization"));
+        }
+
+        @Test
+        @DisplayName("Should not forward hop-by-hop response headers")
+        void shouldNotForwardHopByHopResponseHeaders() throws Exception {
+            mockServer.addEndpoint("/hop", "GET", 200, "ok".getBytes(), Map.of(
+                    "Connection", List.of("X-Internal"),
+                    "X-Internal", List.of("secret"),
+                    "Proxy-Authenticate", List.of("Basic"),
+                    "X-Kept", List.of("yes")));
+            mockServer.start();
+
+            HttpResponse<String> response = sendRequestToProxyServer("/hop", "GET");
+
+            assertEquals("yes", response.headers().firstValue("X-Kept").orElse(null));
+            assertTrue(response.headers().firstValue("X-Internal").isEmpty());
+            assertTrue(response.headers().firstValue("Proxy-Authenticate").isEmpty());
         }
     }
 

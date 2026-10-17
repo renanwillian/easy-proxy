@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -29,10 +31,15 @@ import java.util.function.Supplier;
 
 public class ProxyHandler implements HttpHandler {
 
-    private static final Set<String> RESTRICTED_HEADERS = Set
-            .of("host", "content-length", "connection", "expect", "upgrade", "transfer-encoding");
-    private static final Set<String> RESPONSE_FRAMING_HEADERS = Set
-            .of("content-length", "transfer-encoding", "connection");
+    /** Hop-by-hop headers (RFC 9110 section 7.6.1): they describe a single connection and are never forwarded. */
+    private static final Set<String> HOP_BY_HOP_HEADERS = Set.of(
+            "connection", "keep-alive", "proxy-connection", "te", "trailer", "transfer-encoding", "upgrade",
+            "proxy-authenticate", "proxy-authorization");
+    /** Request headers set by HttpClient itself, or by this proxy. */
+    private static final Set<String> MANAGED_REQUEST_HEADERS = Set.of(
+            "host", "content-length", "expect", "x-forwarded-for", "x-forwarded-host", "x-forwarded-proto");
+    /** Response headers HttpServer sets itself from the length passed to sendResponseHeaders. */
+    private static final Set<String> MANAGED_RESPONSE_HEADERS = Set.of("content-length");
     private static final int BUFFER_SIZE = 16 * 1024;
 
     private final String targetUrl;
@@ -95,13 +102,51 @@ public class ProxyHandler implements HttpHandler {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(fullTargetUrl))
                                                  .timeout(requestTimeout);
 
-        exchange.getRequestHeaders().forEach((name, values) -> {
-            if (!RESTRICTED_HEADERS.contains(name.toLowerCase())) {
+        Map<String, List<String>> requestHeaders = exchange.getRequestHeaders();
+        Set<String> excluded = excludedHeaders(requestHeaders, MANAGED_REQUEST_HEADERS);
+        requestHeaders.forEach((name, values) -> {
+            if (!excluded.contains(name.toLowerCase(Locale.ROOT))) {
                 values.forEach(value -> builder.header(name, value));
             }
         });
+        addForwardedHeaders(exchange, builder);
 
         return builder.method(exchange.getRequestMethod(), requestBodyPublisher(exchange, requestCapture)).build();
+    }
+
+    /**
+     * Tells the target who the original client was. An existing X-Forwarded-For chain is extended; existing
+     * X-Forwarded-Host and X-Forwarded-Proto values (set by a proxy in front of this one) are kept.
+     */
+    private static void addForwardedHeaders(HttpExchange exchange, HttpRequest.Builder builder) {
+        var headers = exchange.getRequestHeaders();
+        String clientIp = exchange.getRemoteAddress().getAddress().getHostAddress();
+
+        String forwardedFor = headers.containsKey("X-Forwarded-For")
+                ? String.join(", ", headers.get("X-Forwarded-For")) + ", " + clientIp
+                : clientIp;
+        builder.header("X-Forwarded-For", forwardedFor);
+
+        String forwardedHost = headers.containsKey("X-Forwarded-Host") ? headers.getFirst("X-Forwarded-Host") : headers.getFirst("Host");
+        if (forwardedHost != null) builder.header("X-Forwarded-Host", forwardedHost);
+
+        String forwardedProto = headers.containsKey("X-Forwarded-Proto") ? headers.getFirst("X-Forwarded-Proto") : "http";
+        builder.header("X-Forwarded-Proto", forwardedProto);
+    }
+
+    /** Hop-by-hop headers, the headers named in Connection, and {@code managed}, all in lowercase. */
+    private static Set<String> excludedHeaders(Map<String, List<String>> headers, Set<String> managed) {
+        Set<String> excluded = new HashSet<>(HOP_BY_HOP_HEADERS);
+        excluded.addAll(managed);
+        headers.forEach((name, values) -> {
+            if (name != null && name.equalsIgnoreCase("Connection")) {
+                values.forEach(value -> Arrays.stream(value.split(","))
+                                              .map(token -> token.strip().toLowerCase(Locale.ROOT))
+                                              .filter(token -> !token.isEmpty())
+                                              .forEach(excluded::add));
+            }
+        });
+        return excluded;
     }
 
     /** Streams the client's body upstream, keeping its Content-Length when it is known. */
@@ -170,8 +215,9 @@ public class ProxyHandler implements HttpHandler {
 
     private static Map<String, List<String>> getResponseHeaders(HttpResponse<?> response) {
         Map<String, List<String>> responseHeaders = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        Set<String> excluded = excludedHeaders(response.headers().map(), MANAGED_RESPONSE_HEADERS);
         response.headers().map().forEach((key, value) -> {
-            if (key != null && value != null && !RESPONSE_FRAMING_HEADERS.contains(key.toLowerCase())) {
+            if (key != null && value != null && !excluded.contains(key.toLowerCase(Locale.ROOT))) {
                 responseHeaders.put(key, List.copyOf(value));
             }
         });
