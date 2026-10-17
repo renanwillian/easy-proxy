@@ -4,10 +4,14 @@ import com.renanwillian.easyproxy.log.LogService;
 import com.renanwillian.easyproxy.proxy.ProxyConfig;
 import com.renanwillian.easyproxy.proxy.ProxyServer;
 import com.renanwillian.easyproxy.utils.TerminalUtils;
+import com.renanwillian.easyproxy.utils.UrlUtils;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Option;
+import picocli.CommandLine.ParameterException;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
 import java.time.Duration;
 import java.util.concurrent.Callable;
@@ -18,6 +22,9 @@ public class EasyProxy implements Callable<Integer> {
 
     static final int EXIT_OK = 0;
     static final int EXIT_ERROR = 1;
+
+    @Spec
+    private CommandSpec spec;
 
     @Option(names = {"--port"}, description = "The port on which the server will run (default: 8000).")
     private int port = 8000;
@@ -47,10 +54,7 @@ public class EasyProxy implements Callable<Integer> {
     @Override
     public Integer call() {
         LogService logService = new LogService(headers, details);
-        if (timeoutSeconds <= 0) {
-            TerminalUtils.printlnError("Invalid timeout: " + timeoutSeconds + ". It must be greater than zero.");
-            return EXIT_ERROR;
-        }
+        validateOptions();
 
         ProxyConfig config = ProxyConfig.of(port, targetUrl)
                                         .withHost(host)
@@ -76,5 +80,19 @@ public class EasyProxy implements Callable<Integer> {
 
     private static String displayHost(String host) {
         return "127.0.0.1".equals(host) ? "localhost" : host;
+    }
+
+    private void validateOptions() {
+        if (port < 1 || port > 65535) {
+            throw new ParameterException(spec.commandLine(), "Invalid port: " + port + ". It must be between 1 and 65535.");
+        }
+        if (timeoutSeconds <= 0) {
+            throw new ParameterException(spec.commandLine(), "Invalid timeout: " + timeoutSeconds + ". It must be greater than zero.");
+        }
+        try {
+            targetUrl = UrlUtils.sanitizeUrl(targetUrl);
+        } catch (IllegalArgumentException e) {
+            throw new ParameterException(spec.commandLine(), "Invalid target URL: " + e.getMessage());
+        }
     }
 }
