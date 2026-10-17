@@ -27,42 +27,44 @@ easy-proxy --version
 ## 📖 Usage
 ```text
 $ easy-proxy --help
-Usage: easy-proxy [-hkV] [--details] [--headers] [--host=<host>]
-                  [--max-body-size=<bytes>] [--no-color] [--port=<port>]
-                  [--show-secrets]
+Usage: easy-proxy [-hkV] [--details] [--headers] [--no-color] [--show-secrets]
+                  [--host=<host>] [--max-body-size=<bytes>] [--port=<port>]
                   [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
-
-  TARGET_URL        The target URL for the proxy.
-  --details         Show the details of each request/response (default: false).
-  --headers         Show the headers of each request/response (default: false).
-  --host=<host>     The address the server binds to. Use 0.0.0.0 to accept
-                      connections from other machines (default: 127.0.0.1).
-  --max-body-size=<bytes>
-                    Maximum number of body bytes shown with --details; 0
-                      means no limit (default: 4096).
-  --no-color        Disable colored output. Also disabled when NO_COLOR is set
-                      or the output is not a terminal.
-  --port=<port>     The port on which the server will run (default: 8000).
-  --show-secrets    Show credentials (Authorization, cookies, API keys) in
-                      logged headers instead of masking them (default: false).
-  --timeout=<seconds>
-                    How long to wait for the target to start responding
-                      (default: 10).
-  -k, --insecure    Accept any TLS certificate from the target, e.g. self-signed
-                      ones (default: false).
-  -h, --help        Show this help message and exit.
-  -V, --version     Print version information and exit.
+      TARGET_URL            The target URL for the proxy.
+      --details             Show the details of each request / response
+                              (default: false).
+  -h, --help                Show this help message and exit.
+      --headers             Show the headers of each request / response
+                              (default: false).
+      --host=<host>         The address the server binds to. Use 0.0.0.0 to
+                              accept connections from other machines (default:
+                              127.0.0.1).
+  -k, --insecure            Accept any TLS certificate from the target, e.g.
+                              self-signed ones (default: false).
+      --max-body-size=<bytes>
+                            Maximum number of body bytes shown with --details;
+                              0 means no limit (default: 4096).
+      --no-color            Disable colored output. Also disabled when NO_COLOR
+                              is set or the output is not a terminal.
+      --port=<port>         The port on which the server will run (default:
+                              8000).
+      --show-secrets        Show credentials (Authorization, cookies, API keys)
+                              in logged headers instead of masking them
+                              (default: false).
+      --timeout=<seconds>   How long to wait for the target to start responding
+                              (default: 10).
+  -V, --version             Print version information and exit.
 ```
 
 ## 🚀 Example
 ```text
 $ easy-proxy https://httpbin.org/ --port 8080
-Proxy server running on http://localhost:8080 and redirecting to https://httpbin.org/
+Proxy server running on http://localhost:8080 and redirecting to https://httpbin.org
 ```
 
 ## ✨ Quick Tip
-You can customize the server behavior using the --details, --headers, and --port flags.
+Use --headers and --details to inspect traffic, and --port or --host to change where the proxy listens.
 Use -h or --help at any time to see all available options.
 
 
