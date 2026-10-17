@@ -6,17 +6,22 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.http.HttpClient;
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ProxyServer implements AutoCloseable {
 
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+
     private final ProxyConfig config;
     private final String targetUrl;
     private final LogService logService;
     private HttpServer server;
     private ExecutorService executor;
+    private HttpClient httpClient;
     private boolean isRunning = false;
 
     public ProxyServer(ProxyConfig config, LogService logService) {
@@ -27,7 +32,10 @@ public class ProxyServer implements AutoCloseable {
 
     public void start() throws IOException {
         server = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
-        server.createContext("/", new ProxyHandler(targetUrl, logService));
+        httpClient = HttpClient.newBuilder()
+                               .connectTimeout(CONNECT_TIMEOUT)
+                               .build();
+        server.createContext("/", new ProxyHandler(targetUrl, httpClient, config.timeout(), logService));
 
         executor = Executors.newVirtualThreadPerTaskExecutor();
         server.setExecutor(executor);
@@ -52,6 +60,10 @@ public class ProxyServer implements AutoCloseable {
                 executor.shutdownNow();
                 Thread.currentThread().interrupt();
             }
+        }
+
+        if (httpClient != null) {
+            httpClient.close();
         }
     }
 

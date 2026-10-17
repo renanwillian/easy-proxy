@@ -21,7 +21,7 @@ easy-proxy --version
 ```text
 $ easy-proxy --help
 Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>] [--port=<port>]
-                  TARGET_URL
+                  [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
 
   TARGET_URL        The target URL for the proxy.
@@ -30,6 +30,9 @@ Starts a reverse proxy server.
   --host=<host>     The address the server binds to. Use 0.0.0.0 to accept
                       connections from other machines (default: 127.0.0.1).
   --port=<port>     The port on which the server will run (default: 8000).
+  --timeout=<seconds>
+                    How long to wait for the target to start responding
+                      (default: 10).
   -h, --help        Show this help message and exit.
   -V, --version     Print version information and exit.
 ```

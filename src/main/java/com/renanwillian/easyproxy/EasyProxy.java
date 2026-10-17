@@ -9,6 +9,7 @@ import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
 import picocli.CommandLine.Parameters;
 
+import java.time.Duration;
 import java.util.concurrent.Callable;
 
 @Command(name = "easy-proxy", mixinStandardHelpOptions = true, versionProvider = VersionProvider.class,
@@ -24,6 +25,10 @@ public class EasyProxy implements Callable<Integer> {
     @Option(names = {"--host"}, description = "The address the server binds to. Use 0.0.0.0 to accept "
             + "connections from other machines (default: " + ProxyConfig.DEFAULT_HOST + ").")
     private String host = ProxyConfig.DEFAULT_HOST;
+
+    @Option(names = {"--timeout"}, paramLabel = "<seconds>",
+            description = "How long to wait for the target to start responding (default: 10).")
+    private long timeoutSeconds = ProxyConfig.DEFAULT_TIMEOUT.toSeconds();
 
     @Option(names = {"--details"}, description = "Show the details of each request / response (default: false).")
     private boolean details = false;
@@ -42,7 +47,14 @@ public class EasyProxy implements Callable<Integer> {
     @Override
     public Integer call() {
         LogService logService = new LogService(headers, details);
-        ProxyConfig config = ProxyConfig.of(port, targetUrl).withHost(host);
+        if (timeoutSeconds <= 0) {
+            TerminalUtils.printlnError("Invalid timeout: " + timeoutSeconds + ". It must be greater than zero.");
+            return EXIT_ERROR;
+        }
+
+        ProxyConfig config = ProxyConfig.of(port, targetUrl)
+                                        .withHost(host)
+                                        .withTimeout(Duration.ofSeconds(timeoutSeconds));
         try (ProxyServer server = new ProxyServer(config, logService)) {
             server.start();
 

@@ -28,20 +28,20 @@ import java.util.TreeMap;
 
 public class ProxyHandler implements HttpHandler {
 
-    private static final HttpClient HTTP_CLIENT = HttpClient.newBuilder()
-                                                            .connectTimeout(Duration.ofSeconds(5))
-                                                            .build();
-    private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(10);
     private static final Set<String> RESTRICTED_HEADERS = Set
             .of("host", "content-length", "connection", "expect", "upgrade", "transfer-encoding");
     private static final Set<String> RESPONSE_FRAMING_HEADERS = Set
             .of("content-length", "transfer-encoding", "connection");
 
     private final String targetUrl;
+    private final HttpClient httpClient;
+    private final Duration requestTimeout;
     private final LogService logService;
 
-    public ProxyHandler(String targetUrl, LogService logService) {
+    public ProxyHandler(String targetUrl, HttpClient httpClient, Duration requestTimeout, LogService logService) {
         this.targetUrl = targetUrl;
+        this.httpClient = httpClient;
+        this.requestTimeout = requestTimeout;
         this.logService = logService;
     }
 
@@ -60,7 +60,7 @@ public class ProxyHandler implements HttpHandler {
             HttpRequest request = buildRequest(exchange, requestBody);
             log.setRequestHeaders(getRequestHeaders(exchange));
 
-            HttpResponse<byte[]> response = HTTP_CLIENT.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> response = httpClient.send(request, HttpResponse.BodyHandlers.ofByteArray());
 
             log.setStatusCode(response.statusCode());
             log.setResponseMessage(HttpUtils.getStatusText(response.statusCode()));
@@ -86,7 +86,7 @@ public class ProxyHandler implements HttpHandler {
     private HttpRequest buildRequest(HttpExchange exchange, byte[] requestBody) {
         String fullTargetUrl = targetUrl + exchange.getRequestURI().toString();
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(fullTargetUrl))
-                                                 .timeout(REQUEST_TIMEOUT);
+                                                 .timeout(requestTimeout);
 
         exchange.getRequestHeaders().forEach((name, values) -> {
             if (!RESTRICTED_HEADERS.contains(name.toLowerCase())) {

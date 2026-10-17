@@ -173,6 +173,23 @@ class ProxyServerTest {
         assertEquals("0", response.headers().firstValue("Content-Length").orElse(null));
     }
 
+    @Test
+    @DisplayName("Should return Gateway Timeout when upstream exceeds the configured timeout")
+    void shouldReturnGatewayTimeoutWhenUpstreamIsTooSlow() throws Exception {
+        mockServer.addSlowEndpoint("/slow", "GET", Duration.ofSeconds(2));
+        mockServer.start();
+
+        ProxyConfig config = ProxyConfig.of(0, TARGET_URL).withTimeout(Duration.ofMillis(200));
+        try (ProxyServer server = new ProxyServer(config, logService)) {
+            server.start();
+            HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + server.getPort() + "/slow")).build();
+
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(504, response.statusCode());
+        }
+    }
+
     @Nested
     @DisplayName("Bind Address Tests")
     class BindAddressTests {

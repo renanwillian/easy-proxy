@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,12 @@ public class MockServer {
 
     public void addEndpoint(String path, String method, int statusCode, byte[] responseBody,
                             Map<String, List<String>> responseHeaders) {
-        endpoints.add(new MockEndpoint(path, method, statusCode, responseBody, responseHeaders));
+        endpoints.add(new MockEndpoint(path, method, statusCode, responseBody, responseHeaders, Duration.ZERO));
+    }
+
+    /** Adds an endpoint that waits {@code delay} before sending the response headers. */
+    public void addSlowEndpoint(String path, String method, Duration delay) {
+        endpoints.add(new MockEndpoint(path, method, 200, "slow".getBytes(StandardCharsets.UTF_8), Map.of(), delay));
     }
 
     public boolean isRunning() {
@@ -71,7 +77,7 @@ public class MockServer {
     }
 
     private record MockEndpoint(String path, String method, int statusCode, byte[] responseBody,
-                                Map<String, List<String>> responseHeaders) {}
+                                Map<String, List<String>> responseHeaders, Duration delay) {}
 
     private record GenericHandler(MockEndpoint endpoint, MockServer mockServer) implements HttpHandler {
 
@@ -87,6 +93,15 @@ public class MockServer {
             if (!Objects.equals(exchange.getRequestMethod(), endpoint.method())) {
                 exchange.sendResponseHeaders(METHOD_NOT_ALLOWED, -1);
                 return;
+            }
+
+            if (!endpoint.delay().isZero()) {
+                try {
+                    Thread.sleep(endpoint.delay());
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
             }
 
             endpoint.responseHeaders().forEach((name, values) -> values.forEach(v -> exchange.getResponseHeaders().add(name, v)));
