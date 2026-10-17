@@ -20,12 +20,15 @@ easy-proxy --version
 ## 📖 Usage
 ```text
 $ easy-proxy --help
-Usage: easy-proxy [-hV] [--details] [--headers] [--port=<port>] TARGET_URL
+Usage: easy-proxy [-hV] [--details] [--headers] [--host=<host>] [--port=<port>]
+                  TARGET_URL
 Starts a reverse proxy server.
 
   TARGET_URL        The target URL for the proxy.
   --details         Show the details of each request/response (default: false).
   --headers         Show the headers of each request/response (default: false).
+  --host=<host>     The address the server binds to. Use 0.0.0.0 to accept
+                      connections from other machines (default: 127.0.0.1).
   --port=<port>     The port on which the server will run (default: 8000).
   -h, --help        Show this help message and exit.
   -V, --version     Print version information and exit.

@@ -56,7 +56,7 @@ class ProxyServerTest {
     @BeforeEach
     void setUp() throws IOException {
         mockServer = new MockServer(MOCK_SERVER_PORT);
-        proxyServer = new ProxyServer(PROXY_SERVER_PORT, TARGET_URL, logService);
+        proxyServer = new ProxyServer(ProxyConfig.of(PROXY_SERVER_PORT, TARGET_URL), logService);
         proxyServer.start();
 
         httpClient = HttpClient.newBuilder()
@@ -171,6 +171,28 @@ class ProxyServerTest {
         assertTrue(response.headers().firstValue("Transfer-Encoding").isEmpty(),
                 "Empty body should not be sent as chunked");
         assertEquals("0", response.headers().firstValue("Content-Length").orElse(null));
+    }
+
+    @Nested
+    @DisplayName("Bind Address Tests")
+    class BindAddressTests {
+        @Test
+        @DisplayName("Should bind to loopback by default")
+        void shouldBindToLoopbackByDefault() throws Exception {
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL), logService)) {
+                server.start();
+                assertTrue(server.getAddress().getAddress().isLoopbackAddress());
+            }
+        }
+
+        @Test
+        @DisplayName("Should bind to the configured host")
+        void shouldBindToConfiguredHost() throws Exception {
+            try (ProxyServer server = new ProxyServer(ProxyConfig.of(0, TARGET_URL).withHost("0.0.0.0"), logService)) {
+                server.start();
+                assertTrue(server.getAddress().getAddress().isAnyLocalAddress());
+            }
+        }
     }
 
     @Nested
@@ -337,12 +359,12 @@ class ProxyServerTest {
     @Test
     @DisplayName("Should close connection with AutoCloseable")
     void testAutoCloseableImplementation() throws Exception {
-        try (ProxyServer autoCloseableServer = new ProxyServer(8889, TARGET_URL, logService)) {
+        try (ProxyServer autoCloseableServer = new ProxyServer(ProxyConfig.of(8889, TARGET_URL), logService)) {
             autoCloseableServer.start();
             assertTrue(autoCloseableServer.isRunning());
         }
 
-        try (ProxyServer newServer = new ProxyServer(8889, TARGET_URL, logService)) {
+        try (ProxyServer newServer = new ProxyServer(ProxyConfig.of(8889, TARGET_URL), logService)) {
             newServer.start();
             assertTrue(newServer.isRunning());
         }

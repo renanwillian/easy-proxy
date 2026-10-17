@@ -12,21 +12,21 @@ import java.util.concurrent.TimeUnit;
 
 public class ProxyServer implements AutoCloseable {
 
-    private final int port;
+    private final ProxyConfig config;
     private final String targetUrl;
     private final LogService logService;
     private HttpServer server;
     private ExecutorService executor;
     private boolean isRunning = false;
 
-    public ProxyServer(int port, String targetUrl, LogService logService) {
-        this.port = port;
-        this.targetUrl = UrlUtils.sanitizeUrl(targetUrl);
+    public ProxyServer(ProxyConfig config, LogService logService) {
+        this.config = config;
+        this.targetUrl = UrlUtils.sanitizeUrl(config.targetUrl());
         this.logService = logService;
     }
 
     public void start() throws IOException {
-        server = HttpServer.create(new InetSocketAddress(port), 0);
+        server = HttpServer.create(new InetSocketAddress(config.host(), config.port()), 0);
         server.createContext("/", new ProxyHandler(targetUrl, logService));
 
         executor = Executors.newVirtualThreadPerTaskExecutor();
@@ -53,6 +53,15 @@ public class ProxyServer implements AutoCloseable {
                 Thread.currentThread().interrupt();
             }
         }
+    }
+
+    /** The address the server is bound to; the port differs from the configured one when it was 0. */
+    public InetSocketAddress getAddress() {
+        return server.getAddress();
+    }
+
+    public int getPort() {
+        return getAddress().getPort();
     }
 
     public boolean isRunning() {

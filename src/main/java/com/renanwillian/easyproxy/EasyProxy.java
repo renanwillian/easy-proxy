@@ -1,6 +1,7 @@
 package com.renanwillian.easyproxy;
 
 import com.renanwillian.easyproxy.log.LogService;
+import com.renanwillian.easyproxy.proxy.ProxyConfig;
 import com.renanwillian.easyproxy.proxy.ProxyServer;
 import com.renanwillian.easyproxy.utils.TerminalUtils;
 import picocli.CommandLine;
@@ -20,6 +21,10 @@ public class EasyProxy implements Callable<Integer> {
     @Option(names = {"--port"}, description = "The port on which the server will run (default: 8000).")
     private int port = 8000;
 
+    @Option(names = {"--host"}, description = "The address the server binds to. Use 0.0.0.0 to accept "
+            + "connections from other machines (default: " + ProxyConfig.DEFAULT_HOST + ").")
+    private String host = ProxyConfig.DEFAULT_HOST;
+
     @Option(names = {"--details"}, description = "Show the details of each request / response (default: false).")
     private boolean details = false;
 
@@ -37,10 +42,12 @@ public class EasyProxy implements Callable<Integer> {
     @Override
     public Integer call() {
         LogService logService = new LogService(headers, details);
-        try (ProxyServer server = new ProxyServer(port, targetUrl, logService)) {
+        ProxyConfig config = ProxyConfig.of(port, targetUrl).withHost(host);
+        try (ProxyServer server = new ProxyServer(config, logService)) {
             server.start();
 
-            TerminalUtils.println("Proxy server running on http://localhost:" + port + " and redirecting to " + targetUrl);
+            TerminalUtils.println("Proxy server running on http://" + displayHost(host) + ":" + server.getPort()
+                    + " and redirecting to " + targetUrl);
             TerminalUtils.println();
 
             Thread.currentThread().join();
@@ -53,5 +60,9 @@ public class EasyProxy implements Callable<Integer> {
             TerminalUtils.printlnError("Error starting the server: " + e.getMessage());
             return EXIT_ERROR;
         }
+    }
+
+    private static String displayHost(String host) {
+        return "127.0.0.1".equals(host) ? "localhost" : host;
     }
 }
