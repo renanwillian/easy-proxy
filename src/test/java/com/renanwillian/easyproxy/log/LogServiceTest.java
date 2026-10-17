@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LogServiceTest {
@@ -55,5 +56,32 @@ class LogServiceTest {
         assertTrue(output.contains("/api"), output);
         assertTrue(output.contains("200 OK"), output);
         assertTrue(output.contains("12ms"), output);
+    }
+
+    @Test
+    void shouldShowRequestAndResponseHeadersWithoutDetails() {
+        LogEntry entry = baseEntry();
+        entry.setRequestHeaders(Map.of("Accept", List.of("application/json")));
+        entry.setResponseHeaders(Map.of("Set-Cookie", List.of("a=1", "b=2")));
+        entry.setResponseBody("secret-body".getBytes());
+
+        String output = new LogService(true, false).format(entry);
+
+        assertTrue(output.contains("Accept: application/json"), output);
+        assertTrue(output.contains("Set-Cookie: a=1"), output);
+        assertTrue(output.contains("Set-Cookie: b=2"), output);
+        assertFalse(output.contains("secret-body"), "Body should only be shown with --details");
+    }
+
+    @Test
+    void shouldNotShowHeadersWithDetailsOnly() {
+        LogEntry entry = baseEntry();
+        entry.setRequestHeaders(Map.of("Accept", List.of("application/json")));
+        entry.setResponseBody("the-body".getBytes());
+
+        String output = new LogService(false, true).format(entry);
+
+        assertFalse(output.contains("Accept: application/json"), output);
+        assertTrue(output.contains("the-body"), output);
     }
 }

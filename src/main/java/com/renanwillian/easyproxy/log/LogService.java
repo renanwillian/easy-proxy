@@ -11,6 +11,7 @@ import java.util.Map;
 public class LogService {
 
     public static final String BREAK = "\n";
+    private static final String SEPARATOR = "-------------------------------------------------------------";
 
     private final boolean showHeaders;
     private final boolean showDetails;
@@ -38,32 +39,46 @@ public class LogService {
 
         sb.append(AnsiUtils.colorize(" (" + logEntry.getDuration() + "ms)", AnsiUtils.PURPLE_BOLD));
 
-        if (showDetails) {
-            sb.append(AnsiUtils.colorize("\n-------------------------------------------------------------\n", AnsiUtils.WHITE));
+        if (showDetails || showHeaders) {
+            sb.append(AnsiUtils.colorize("\n" + SEPARATOR + "\n", AnsiUtils.WHITE));
 
-            sb.append(AnsiUtils.colorize("Timestamp: ", AnsiUtils.WHITE_BOLD));
-            sb.append(AnsiUtils.colorize(logEntry.getTimestamp().toString(), AnsiUtils.WHITE));
-            sb.append(BREAK);
-            if (showHeaders && logEntry.getRequestHeaders() != null) {
-                sb.append(AnsiUtils.colorize("Headers: ", AnsiUtils.WHITE_BOLD));
-                logEntry.getRequestHeaders().forEach((k, values) -> values.forEach(v -> sb.append(AnsiUtils.colorize("\n  " + k + ": " + v, AnsiUtils.WHITE))));
+            if (showDetails) {
+                appendLabel(sb, "Timestamp: ");
+                sb.append(AnsiUtils.colorize(String.valueOf(logEntry.getTimestamp()), AnsiUtils.WHITE));
                 sb.append(BREAK);
+            }
+            if (showHeaders) {
+                appendHeaders(sb, "Request Headers: ", logEntry.getRequestHeaders());
+                appendHeaders(sb, "Response Headers: ", logEntry.getResponseHeaders());
+            }
+            if (showDetails) {
+                appendBody(sb, "Request Body: ", logEntry.getRequestBody(), logEntry.getRequestHeaders());
+                appendBody(sb, "Response Body: ", logEntry.getResponseBody(), logEntry.getResponseHeaders());
             }
 
-            if (logEntry.getRequestBody() != null) {
-                sb.append(AnsiUtils.colorize("Request Body: ", AnsiUtils.WHITE_BOLD));
-                sb.append(AnsiUtils.colorize(getBodyAsString(logEntry.getRequestBody(), logEntry.getRequestHeaders()), AnsiUtils.WHITE));
-                sb.append(BREAK);
-            }
-            if (logEntry.getResponseBody() != null) {
-                sb.append(AnsiUtils.colorize("Response Body: ", AnsiUtils.WHITE_BOLD));
-                sb.append(AnsiUtils.colorize(getBodyAsString(logEntry.getResponseBody(), logEntry.getResponseHeaders()), AnsiUtils.WHITE));
-                sb.append(BREAK);
-            }
-            sb.append(AnsiUtils.colorize("-------------------------------------------------------------\n", AnsiUtils.WHITE));
+            sb.append(AnsiUtils.colorize(SEPARATOR + "\n", AnsiUtils.WHITE));
         }
 
         return sb.toString();
+    }
+
+    private static void appendLabel(StringBuilder sb, String label) {
+        sb.append(AnsiUtils.colorize(label, AnsiUtils.WHITE_BOLD));
+    }
+
+    private static void appendHeaders(StringBuilder sb, String label, Map<String, List<String>> headers) {
+        if (headers == null || headers.isEmpty()) return;
+        appendLabel(sb, label);
+        headers.forEach((name, values) -> values.forEach(value ->
+                sb.append(AnsiUtils.colorize("\n  " + name + ": " + value, AnsiUtils.WHITE))));
+        sb.append(BREAK);
+    }
+
+    private void appendBody(StringBuilder sb, String label, byte[] body, Map<String, List<String>> headers) {
+        if (body == null) return;
+        appendLabel(sb, label);
+        sb.append(AnsiUtils.colorize(getBodyAsString(body, headers), AnsiUtils.WHITE));
+        sb.append(BREAK);
     }
 
     private String getBodyAsString(byte[] body, Map<String, List<String>> headers) {
