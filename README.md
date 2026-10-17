@@ -21,7 +21,8 @@ easy-proxy --version
 ```text
 $ easy-proxy --help
 Usage: easy-proxy [-hkV] [--details] [--headers] [--host=<host>]
-                  [--max-body-size=<bytes>] [--port=<port>] [--show-secrets]
+                  [--max-body-size=<bytes>] [--no-color] [--port=<port>]
+                  [--show-secrets]
                   [--timeout=<seconds>] TARGET_URL
 Starts a reverse proxy server.
 
@@ -33,6 +34,8 @@ Starts a reverse proxy server.
   --max-body-size=<bytes>
                     Maximum number of body bytes shown with --details; 0
                       means no limit (default: 4096).
+  --no-color        Disable colored output. Also disabled when NO_COLOR is set
+                      or the output is not a terminal.
   --port=<port>     The port on which the server will run (default: 8000).
   --show-secrets    Show credentials (Authorization, cookies, API keys) in
                       logged headers instead of masking them (default: false).

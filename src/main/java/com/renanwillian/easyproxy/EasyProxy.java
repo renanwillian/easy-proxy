@@ -3,6 +3,7 @@ package com.renanwillian.easyproxy;
 import com.renanwillian.easyproxy.log.LogService;
 import com.renanwillian.easyproxy.proxy.ProxyConfig;
 import com.renanwillian.easyproxy.proxy.ProxyServer;
+import com.renanwillian.easyproxy.utils.AnsiUtils;
 import com.renanwillian.easyproxy.utils.TerminalUtils;
 import com.renanwillian.easyproxy.utils.UrlUtils;
 import picocli.CommandLine;
@@ -55,6 +56,10 @@ public class EasyProxy implements Callable<Integer> {
             description = "Accept any TLS certificate from the target, e.g. self-signed ones (default: false).")
     private boolean insecure = false;
 
+    @Option(names = {"--no-color"}, description = "Disable colored output. Also disabled when NO_COLOR is set or "
+            + "the output is not a terminal.")
+    private boolean noColor = false;
+
     @Parameters(paramLabel = "TARGET_URL", description = "The target URL for the proxy.")
     private String targetUrl;
 
@@ -66,6 +71,7 @@ public class EasyProxy implements Callable<Integer> {
     @Override
     public Integer call() {
         validateOptions();
+        if (noColor) AnsiUtils.setEnabled(false);
         LogService logService = new LogService(headers, details, maxBodySize, showSecrets);
 
         ProxyConfig config = ProxyConfig.of(port, targetUrl)
