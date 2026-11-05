@@ -50,8 +50,9 @@ public class LogService {
 
     String format(LogEntry logEntry) {
         StringBuilder sb = new StringBuilder();
-        sb.append(AnsiUtils.colorize(logEntry.method(), AnsiUtils.CYAN));
-        sb.append(" ").append(logEntry.path());
+        // The method, path, headers, bodies and error come from the client or the target, so they are escaped.
+        sb.append(AnsiUtils.colorize(ControlChars.escape(logEntry.method()), AnsiUtils.CYAN));
+        sb.append(" ").append(ControlChars.escape(logEntry.path()));
 
         String color = logEntry.statusCode() >= 400 ? AnsiUtils.RED_BOLD : AnsiUtils.GREEN_BOLD;
         sb.append(AnsiUtils.colorize(" -> " + logEntry.statusCode() + " " + logEntry.responseMessage(), color));
@@ -59,7 +60,7 @@ public class LogService {
         sb.append(AnsiUtils.colorize(" (" + logEntry.duration().toMillis() + "ms)", AnsiUtils.PURPLE_BOLD));
 
         if (logEntry.error() != null) {
-            sb.append(AnsiUtils.colorize("\n  Cause: " + logEntry.error(), AnsiUtils.RED_BOLD));
+            sb.append(AnsiUtils.colorize("\n  Cause: " + ControlChars.escape(logEntry.error()), AnsiUtils.RED_BOLD));
         }
 
         if (showDetails || showHeaders) {
@@ -94,7 +95,8 @@ public class LogService {
         appendLabel(sb, label);
         headers.forEach((name, values) -> values.forEach(value -> {
             String shown = showSecrets ? value : HeaderMasker.mask(name, value);
-            sb.append(AnsiUtils.colorize("\n  " + name + ": " + shown, AnsiUtils.WHITE));
+            sb.append(AnsiUtils.colorize("\n  " + ControlChars.escape(name) + ": " + ControlChars.escape(shown),
+                    AnsiUtils.WHITE));
         }));
         sb.append(BREAK);
     }

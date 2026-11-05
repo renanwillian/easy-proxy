@@ -124,4 +124,20 @@ class BodyFormatterTest {
 
         assertTrue(output.startsWith("(error decompressing gzip body"), output);
     }
+
+    @Test
+    void shouldEscapeControlCharactersInTextBodies() {
+        String output = unlimited.format("hi \u001b]0;pwned\u0007\u001b[2J".getBytes(StandardCharsets.UTF_8),
+                headers("Content-Type", "text/plain"));
+
+        assertEquals("hi \\x1b]0;pwned\\x07\\x1b[2J", output);
+    }
+
+    @Test
+    void shouldEscapeControlCharactersInTruncatedBodies() {
+        String output = formatter.format("\u001b[2Jabcdefghijklmnop".getBytes(StandardCharsets.UTF_8),
+                headers("Content-Type", "text/plain"));
+
+        assertTrue(output.startsWith("\\x1b[2Jabcdef... (truncated"), output);
+    }
 }

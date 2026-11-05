@@ -43,29 +43,30 @@ class BodyFormatter {
         boolean partial = captured.length < totalSize;
         String contentEncoding = HttpUtils.firstHeaderValue(headers, "Content-Encoding");
         if (!CompressionUtils.isSupported(contentEncoding)) {
-            return "(" + contentEncoding + "-encoded body, " + totalSize + " bytes)";
+            return "(" + ControlChars.escape(contentEncoding) + "-encoded body, " + totalSize + " bytes)";
         }
 
         byte[] decoded;
         try {
             decoded = CompressionUtils.decompress(captured, contentEncoding, partial);
         } catch (IOException e) {
-            return "(error decompressing " + contentEncoding + " body, " + totalSize + " bytes)";
+            return "(error decompressing " + ControlChars.escape(contentEncoding) + " body, " + totalSize + " bytes)";
         }
 
         String contentType = HttpUtils.firstHeaderValue(headers, "Content-Type");
         long size = partial ? totalSize : decoded.length;
         if (!isText(contentType, decoded)) {
-            return "(binary body, " + size + " bytes" + (contentType != null ? ", " + contentType : "") + ")";
+            return "(binary body, " + size + " bytes"
+                    + (contentType != null ? ", " + ControlChars.escape(contentType) : "") + ")";
         }
 
         Charset charset = charsetOf(contentType);
         boolean overLimit = maxBodySize > 0 && decoded.length > maxBodySize;
         if (overLimit || partial) {
             int shown = overLimit ? maxBodySize : decoded.length;
-            return new String(decoded, 0, shown, charset) + "... (truncated, " + size + " bytes total)";
+            return ControlChars.escape(new String(decoded, 0, shown, charset)) + "... (truncated, " + size + " bytes total)";
         }
-        return new String(decoded, charset);
+        return ControlChars.escape(new String(decoded, charset));
     }
 
     private static boolean isText(String contentType, byte[] body) {
